@@ -11,14 +11,16 @@ public class GameManager : MonoBehaviour
 
     public GameState     State           { get; private set; }
     public PlayerStats   Player          { get; private set; }
-    public PathData[]    CurrentPaths    { get; private set; }
+    public MapData       CurrentMap      { get; private set; }
+    public int           CurrentFloor    { get; private set; }
     public UpgradeData[] CurrentUpgrades { get; private set; }
 
     public int      LastLootHp   { get; private set; }
     public int      LastLootGold { get; private set; }
     public PathData LastPath     { get; private set; }
 
-    private int battleNumber;
+    public const int MAP_ROWS = 8;
+
     private System.Random rng = new System.Random();
 
     void Awake()
@@ -35,24 +37,40 @@ public class GameManager : MonoBehaviour
     {
         Player = new PlayerStats();
         Player.Initialize();
-        battleNumber = 0;
+        CurrentFloor = 0;
         State = GameState.Map;
-        GeneratePaths();
+        GenerateMap();
     }
 
-    void GeneratePaths()
+    void GenerateMap()
     {
-        CurrentPaths = new PathData[3];
-        for (int i = 0; i < 3; i++)
-            CurrentPaths[i] = PathData.Generate(rng, battleNumber);
+        var rows  = new PathData[MAP_ROWS][];
+        var conns = new System.Collections.Generic.List<int>[MAP_ROWS][];
+
+        for (int row = 0; row < MAP_ROWS; row++)
+        {
+            rows[row] = new PathData[3];
+            for (int col = 0; col < 3; col++)
+                rows[row][col] = PathData.Generate(rng, row);
+
+            conns[row] = row < MAP_ROWS - 1
+                ? MapData.GenerateConnections(rng)
+                : new System.Collections.Generic.List<int>[]
+                  { new System.Collections.Generic.List<int>(),
+                    new System.Collections.Generic.List<int>(),
+                    new System.Collections.Generic.List<int>() };
+        }
+
+        CurrentMap = new MapData(rows, conns);
     }
 
-    public void StartBattle(int pathIndex)
+    public void StartBattle(int col)
     {
-        LastPath = CurrentPaths[pathIndex];
+        CurrentMap.chosenColumns[CurrentFloor] = col;
+        LastPath = CurrentMap.rows[CurrentFloor][col];
         State = GameState.Combat;
 
-        int enemyHp  = Mathf.Max(LastPath.GetEnemyHp(battleNumber) - Player.enemyStartHpPenalty, 1);
+        int enemyHp  = Mathf.Max(LastPath.GetEnemyHp(CurrentFloor) - Player.enemyStartHpPenalty, 1);
         int enemyDmg = LastPath.EnemyDamage;
 
         CombatManager.Instance.StartBattle(Player, enemyHp, enemyDmg);
@@ -71,19 +89,27 @@ public class GameManager : MonoBehaviour
         yield return new WaitForSeconds(1.5f);
         if (playerWon)
         {
-            battleNumber++;
+            CurrentFloor++;
 
             if (Player.winHeal > 0)
                 Player.hp = Mathf.Min(Player.hp + Player.winHeal, Player.maxHp);
 
             LastLootHp   = Mathf.Min(LastPath.LootHp, 100);
-            LastLootGold = rng.Next(LastPath.LootGoldMin, LastPath.LootGoldMax + 1);
+            LastLootGold = rng.Next(LastPath.LootGoldMin, LastPath.LootGoldMax + 1) + Player.goldBonus;
             Player.hp   = Mathf.Min(Player.hp + LastLootHp, Player.maxHp);
             Player.gold += LastLootGold;
 
-            CurrentUpgrades = PickRandomUpgrades(3);
-            State = GameState.Loot;
-            UIManager.Instance?.ShowLoot();
+            if (CurrentFloor >= MAP_ROWS)
+            {
+                State = GameState.GameOver;
+                UIManager.Instance?.ShowGameOver();
+            }
+            else
+            {
+                CurrentUpgrades = PickRandomUpgrades(3);
+                State = GameState.Loot;
+                UIManager.Instance?.ShowLoot();
+            }
         }
         else
         {
@@ -94,7 +120,7 @@ public class GameManager : MonoBehaviour
 
     UpgradeData[] PickRandomUpgrades(int count)
     {
-        var pool = UpgradeData.All.ToList();
+        var pool   = UpgradeData.All.ToList();
         var result = new List<UpgradeData>();
         while (result.Count < count && pool.Count > 0)
         {
@@ -110,18 +136,29 @@ public class GameManager : MonoBehaviour
         Player.acquiredUpgrades.Add(upgradeId);
         switch (upgradeId)
         {
-            case 1:  Player.maxHp += 20; Player.hp = Mathf.Min(Player.hp + 20, Player.maxHp); break;
-            case 2:  Player.startingBullets      += 1;  break;
-            case 3:  Player.fireDamageBonus      += 10; break;
-            case 4:  Player.reloadBonus          += 1;  break;
-            case 5:  Player.maxBulletsBonus      += 1;  break;
-            case 6:  Player.defendHeal           += 5;  break;
-            case 7:  Player.firstShotDamageBonus += 20; break;
-            case 8:  Player.winHeal              += 15; break;
-            case 9:  Player.enemyStartHpPenalty  += 10; break;
-            case 10: Player.disableFireWhenEmpty  = true; break;
+            // Original
+            case  1: Player.maxHp += 20; Player.hp = Mathf.Min(Player.hp + 20, Player.maxHp); break;
+            case  2: Player.startingBullets      += 1;  break;
+            case  3: Player.fireDamageBonus      += 10; break;
+            case  4: Player.reloadBonus          += 1;  break;
+            case  5: Player.maxBulletsBonus      += 1;  break;
+            case  6: Player.defendHeal           += 5;  break;
+            case  7: Player.firstShotDamageBonus += 20; break;
+            case  8: Player.winHeal              += 15; break;
+            case  9: Player.enemyStartHpPenalty  += 10; break;
+            // New
+            case 10: Player.deadEyeBonus         += 20; break;
+            case 11: Player.damageReduction      += 5;  break;
+            case 12: Player.battleStartHeal      += 10; break;
+            case 13: Player.goldBonus            += 10; break;
+            case 14: Player.reloadHeal           += 5;  break;
+            case 15: Player.ambushBonus          += 25; break;
+            case 16: Player.lastStandBonus       += 20; break;
+            case 17: Player.maxHp                += 15; break;
+            case 18: Player.maxBulletsBonus      += 2;  break;
+            case 19: Player.fireDamageBonus      += 15; break;
+            case 20: Player.enemyStartHpPenalty  += 25; break;
         }
-        GeneratePaths();
         State = GameState.Map;
         UIManager.Instance?.ShowMap();
     }

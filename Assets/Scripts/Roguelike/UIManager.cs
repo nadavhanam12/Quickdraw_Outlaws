@@ -14,8 +14,9 @@ public class UIManager : MonoBehaviour
     public GameObject gameOverScreen;
 
     [Header("Map UI")]
-    public Button[] pathButtons;
+    public MapRenderer mapRenderer;
     public TextMeshProUGUI mapGoldText;
+    public TextMeshProUGUI mapFloorText;
 
     [Header("Combat UI")]
     public TextMeshProUGUI playerHpText;
@@ -45,15 +46,12 @@ public class UIManager : MonoBehaviour
 
     void Start()
     {
+        if (mapRenderer != null)
+            mapRenderer.OnColumnChosen += col => GameManager.Instance.StartBattle(col);
+
         fireButton.onClick.AddListener(() => OnActionButton(CombatAction.Fire));
         defendButton.onClick.AddListener(() => OnActionButton(CombatAction.Defend));
         reloadButton.onClick.AddListener(() => OnActionButton(CombatAction.Reload));
-
-        for (int i = 0; i < pathButtons.Length; i++)
-        {
-            int idx = i;
-            pathButtons[i].onClick.AddListener(() => GameManager.Instance.StartBattle(idx));
-        }
 
         restartButton.onClick.AddListener(() => GameManager.Instance.RestartGame());
     }
@@ -66,15 +64,15 @@ public class UIManager : MonoBehaviour
         SetScreen(mapScreen);
 
         var gm = GameManager.Instance;
+
         if (mapGoldText != null)
             mapGoldText.text = $"Gold: {gm.Player.gold}";
 
-        var paths = gm.CurrentPaths;
-        for (int i = 0; i < pathButtons.Length && i < paths.Length; i++)
-        {
-            var tmp = pathButtons[i].GetComponentInChildren<TextMeshProUGUI>();
-            if (tmp != null) tmp.text = paths[i].ButtonLabel;
-        }
+        if (mapFloorText != null)
+            mapFloorText.text = $"Battle {gm.CurrentFloor + 1} / {GameManager.MAP_ROWS}";
+
+        if (mapRenderer != null)
+            mapRenderer.DrawMap(gm.CurrentMap, gm.CurrentFloor);
     }
 
     public void ShowCombat()
@@ -106,7 +104,9 @@ public class UIManager : MonoBehaviour
             lootTitleText.text = $"LOOT  —  {tierName} Enemy";
 
         if (lootInfoText != null)
-            lootInfoText.text = $"+{gm.LastLootHp} HP  →  {gm.Player.hp}/{gm.Player.maxHp}    +{gm.LastLootGold} Gold  (Total: {gm.Player.gold})";
+            lootInfoText.text =
+                $"+{gm.LastLootHp} HP  →  {gm.Player.hp}/{gm.Player.maxHp}" +
+                $"    +{gm.LastLootGold} Gold  (Total: {gm.Player.gold})";
 
         var upgrades = gm.CurrentUpgrades;
         for (int i = 0; i < upgradeButtons.Length; i++)
@@ -129,7 +129,11 @@ public class UIManager : MonoBehaviour
     {
         UnsubscribeCombat();
         SetScreen(gameOverScreen);
-        gameOverText.text = "YOU DIED\nBetter luck next time";
+        var gm = GameManager.Instance;
+        bool won = gm.CurrentFloor >= GameManager.MAP_ROWS;
+        gameOverText.text = won
+            ? "YOU WON!\nThe Outlaw rides into the sunset"
+            : "YOU DIED\nBetter luck next time";
     }
 
     // ── Combat helpers ────────────────────────────────────────────────────────
@@ -160,7 +164,7 @@ public class UIManager : MonoBehaviour
         enemyHpText.text       = $"HP: {e.hp} / {e.maxHp}";
         enemyBulletsText.text  = $"Bullets: {e.bullets} / {e.maxBullets}";
 
-        fireButton.interactable = !battleEnded && (!p.disableFireWhenEmpty || p.bullets > 0);
+        fireButton.interactable = !battleEnded;
     }
 
     void AddLog(string msg)
