@@ -92,11 +92,21 @@ public static class RoguelikeSceneSetup
 
         // ── LOOT SCREEN ───────────────────────────────────────────────
         var lootTitleTMP = Txt(upgradeGO.transform, "LootTitle", "LOOT",
-            52f, V2(0, 220), V2(500, 90), new Color(1f, 0.85f, 0.2f, 1f), TextAlignmentOptions.Center);
-        var lootInfoTMP = Txt(upgradeGO.transform, "LootInfo", "+50 HP\n+?? Gold\n\nTotal Gold: 0",
-            30f, V2(0, 40), V2(500, 220), Color.white, TextAlignmentOptions.Center);
-        var continueBtn = Btn(upgradeGO.transform, "ContinueButton", "CONTINUE",
-            V2(0, -150), V2(300, 65), new Color(0.2f, 0.45f, 0.2f, 1f));
+            42f, V2(0, 290), V2(700, 70), new Color(1f, 0.85f, 0.2f, 1f), TextAlignmentOptions.Center);
+        var lootInfoTMP = Txt(upgradeGO.transform, "LootInfo", "+?? HP    +?? Gold    (Total: 0)",
+            22f, V2(0, 230), V2(700, 45), Color.white, TextAlignmentOptions.Center);
+
+        // 3 upgrade choice buttons (tall enough for 2 lines of text)
+        var upgBtn1 = Btn(upgradeGO.transform, "UpgradeButton1", "Upgrade 1",  V2(0, 120),  V2(620, 90), new Color(0.22f, 0.18f, 0.38f, 1f));
+        var upgBtn2 = Btn(upgradeGO.transform, "UpgradeButton2", "Upgrade 2",  V2(0,   0),  V2(620, 90), new Color(0.22f, 0.18f, 0.38f, 1f));
+        var upgBtn3 = Btn(upgradeGO.transform, "UpgradeButton3", "Upgrade 3",  V2(0, -120), V2(620, 90), new Color(0.22f, 0.18f, 0.38f, 1f));
+
+        // Grab the TMP components inside each button for runtime text updates
+        var upgTxt1 = upgBtn1.GetComponentInChildren<TextMeshProUGUI>();
+        var upgTxt2 = upgBtn2.GetComponentInChildren<TextMeshProUGUI>();
+        var upgTxt3 = upgBtn3.GetComponentInChildren<TextMeshProUGUI>();
+        foreach (var t in new[] { upgTxt1, upgTxt2, upgTxt3 })
+            t.fontSize = 18f;
 
         // ── GAME OVER ─────────────────────────────────────────────────
         var goTMP = Txt(gameOverGO.transform, "GameOverText",
@@ -127,7 +137,8 @@ public static class RoguelikeSceneSetup
         SetF(uiMgr, "combatLogText",      logTMP);
         SetF(uiMgr, "lootTitleText",      lootTitleTMP);
         SetF(uiMgr, "lootInfoText",       lootInfoTMP);
-        SetF(uiMgr, "continueButton",     continueBtn);
+        SetF(uiMgr, "upgradeButtons",     new Button[] { upgBtn1, upgBtn2, upgBtn3 });
+        SetF(uiMgr, "upgradeButtonTexts", new TextMeshProUGUI[] { upgTxt1, upgTxt2, upgTxt3 });
         SetF(uiMgr, "gameOverText",       goTMP);
         SetF(uiMgr, "restartButton",      restartBtn);
 

@@ -31,7 +31,8 @@ public class UIManager : MonoBehaviour
     [Header("Loot UI")]
     public TextMeshProUGUI lootTitleText;
     public TextMeshProUGUI lootInfoText;
-    public Button continueButton;
+    public Button[] upgradeButtons;
+    public TextMeshProUGUI[] upgradeButtonTexts;
 
     [Header("Game Over UI")]
     public TextMeshProUGUI gameOverText;
@@ -54,7 +55,6 @@ public class UIManager : MonoBehaviour
             pathButtons[i].onClick.AddListener(() => GameManager.Instance.StartBattle(idx));
         }
 
-        continueButton.onClick.AddListener(() => GameManager.Instance.ContinueFromLoot());
         restartButton.onClick.AddListener(() => GameManager.Instance.RestartGame());
     }
 
@@ -69,11 +69,10 @@ public class UIManager : MonoBehaviour
         if (mapGoldText != null)
             mapGoldText.text = $"Gold: {gm.Player.gold}";
 
-        // Stamp path descriptions onto buttons
         var paths = gm.CurrentPaths;
         for (int i = 0; i < pathButtons.Length && i < paths.Length; i++)
         {
-            var tmp = pathButtons[i].GetComponentInChildren<TMPro.TextMeshProUGUI>();
+            var tmp = pathButtons[i].GetComponentInChildren<TextMeshProUGUI>();
             if (tmp != null) tmp.text = paths[i].ButtonLabel;
         }
     }
@@ -102,12 +101,28 @@ public class UIManager : MonoBehaviour
 
         var gm = GameManager.Instance;
         string tierName = PathData.EnemyLabel(gm.LastPath.enemyTier);
-        if (lootTitleText != null) lootTitleText.text = $"LOOT  —  {tierName} Enemy";
-        if (lootInfoText  != null)
-            lootInfoText.text =
-                $"+{gm.LastLootHp} HP\n" +
-                $"+{gm.LastLootGold} Gold\n\n" +
-                $"Total Gold: {gm.Player.gold}";
+
+        if (lootTitleText != null)
+            lootTitleText.text = $"LOOT  —  {tierName} Enemy";
+
+        if (lootInfoText != null)
+            lootInfoText.text = $"+{gm.LastLootHp} HP  →  {gm.Player.hp}/{gm.Player.maxHp}    +{gm.LastLootGold} Gold  (Total: {gm.Player.gold})";
+
+        var upgrades = gm.CurrentUpgrades;
+        for (int i = 0; i < upgradeButtons.Length; i++)
+        {
+            if (i < upgrades.Length)
+            {
+                var u = upgrades[i];
+                upgradeButtonTexts[i].text = $"<b>{u.name}</b>\n{u.description}";
+                upgradeButtons[i].gameObject.SetActive(true);
+                int id = u.id;
+                upgradeButtons[i].onClick.RemoveAllListeners();
+                upgradeButtons[i].onClick.AddListener(() => GameManager.Instance.ApplyUpgrade(id));
+            }
+            else
+                upgradeButtons[i].gameObject.SetActive(false);
+        }
     }
 
     public void ShowGameOver()
@@ -140,9 +155,9 @@ public class UIManager : MonoBehaviour
         var e = CombatManager.Instance.Enemy;
         if (p == null || e == null) return;
 
-        playerHpText.text     = $"HP: {p.hp} / {p.maxHp}";
+        playerHpText.text      = $"HP: {p.hp} / {p.maxHp}";
         playerBulletsText.text = $"Bullets: {p.bullets} / {p.maxBullets}";
-        enemyHpText.text      = $"HP: {e.hp} / {e.maxHp}";
+        enemyHpText.text       = $"HP: {e.hp} / {e.maxHp}";
         enemyBulletsText.text  = $"Bullets: {e.bullets} / {e.maxBullets}";
 
         fireButton.interactable = !battleEnded && (!p.disableFireWhenEmpty || p.bullets > 0);
