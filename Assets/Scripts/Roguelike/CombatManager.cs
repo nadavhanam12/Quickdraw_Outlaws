@@ -7,8 +7,10 @@ public class CombatManager : MonoBehaviour
 {
     public static CombatManager Instance { get; private set; }
 
-    public PlayerStats Player { get; private set; }
-    public EnemyStats  Enemy  { get; private set; }
+    public PlayerStats   Player           { get; private set; }
+    public EnemyStats    Enemy            { get; private set; }
+    public CombatAction? LastPlayerAction { get; private set; }
+    public CombatAction? LastEnemyAction  { get; private set; }
 
     public event Action<string> OnCombatLog;
     public event Action         OnTurnResolved;
@@ -26,6 +28,8 @@ public class CombatManager : MonoBehaviour
         Enemy = new EnemyStats();
         Enemy.Initialize(enemyMaxHp, enemyDamage);
         battleOver = false;
+        LastPlayerAction = null;
+        LastEnemyAction  = null;
 
         if (player.battleStartHeal > 0)
             Log($"War Paint healed {player.battleStartHeal} HP");
@@ -38,26 +42,34 @@ public class CombatManager : MonoBehaviour
         return (CombatAction)rng.Next(3);
     }
 
-    public void ResolveTurn(CombatAction playerAction)
+    // Phase 1: decide both actions, store them — no state changes yet
+    public void DecideActions(CombatAction playerAction)
     {
         if (battleOver) return;
 
-        if (playerAction == CombatAction.Fire && Player.bullets <= 0)
-            playerAction = CombatAction.Reload;
-
-        if (playerAction == CombatAction.Defend && Player.blockUses <= 0)
-            playerAction = CombatAction.Reload;
+        if (playerAction == CombatAction.Fire   && Player.bullets   <= 0) playerAction = CombatAction.Reload;
+        if (playerAction == CombatAction.Defend && Player.blockUses <= 0) playerAction = CombatAction.Reload;
 
         CombatAction enemyAction = GetEnemyAction();
-        if (enemyAction == CombatAction.Fire && Enemy.bullets <= 0)
-            enemyAction = CombatAction.Reload;
+        if (enemyAction == CombatAction.Fire && Enemy.bullets <= 0) enemyAction = CombatAction.Reload;
+
+        LastPlayerAction = playerAction;
+        LastEnemyAction  = enemyAction;
+    }
+
+    // Phase 2: apply the decided actions and fire events
+    public void ApplyTurn()
+    {
+        if (battleOver || !LastPlayerAction.HasValue || !LastEnemyAction.HasValue) return;
+
+        CombatAction playerAction = LastPlayerAction.Value;
+        CombatAction enemyAction  = LastEnemyAction.Value;
 
         bool playerFires   = playerAction == CombatAction.Fire;
         bool enemyFires    = enemyAction  == CombatAction.Fire;
         bool playerDefends = playerAction == CombatAction.Defend;
 
-        if (playerDefends)
-            Player.blockUses--;
+        if (playerDefends) Player.blockUses--;
 
         ApplyPlayerAction(playerAction, enemyAction);
         ApplyEnemyAction(enemyAction);
@@ -66,7 +78,7 @@ public class CombatManager : MonoBehaviour
         {
             bool enemyEmpty     = Enemy.bullets == 0 && enemyAction != CombatAction.Fire;
             bool enemyReloading = enemyAction == CombatAction.Reload;
-            int dmg = Player.GetFireDamage(enemyEmpty, enemyReloading);
+            int  dmg            = Player.GetFireDamage(enemyEmpty, enemyReloading);
             Player.MarkFirstShot();
 
             if (enemyAction == CombatAction.Defend)
@@ -75,12 +87,9 @@ public class CombatManager : MonoBehaviour
             {
                 Enemy.hp -= dmg;
                 string bonusNote = "";
-                if (enemyEmpty && Player.deadEyeBonus > 0)
-                    bonusNote += $" (Dead Eye +{Player.deadEyeBonus})";
-                if (enemyReloading && Player.ambushBonus > 0)
-                    bonusNote += $" (Ambush +{Player.ambushBonus})";
-                if (Player.lastStandBonus > 0 && Player.hp <= Player.maxHp / 3)
-                    bonusNote += $" (Last Stand +{Player.lastStandBonus})";
+                if (enemyEmpty     && Player.deadEyeBonus  > 0) bonusNote += $" (Dead Eye +{Player.deadEyeBonus})";
+                if (enemyReloading && Player.ambushBonus   > 0) bonusNote += $" (Ambush +{Player.ambushBonus})";
+                if (Player.lastStandBonus > 0 && Player.hp <= Player.maxHp / 3) bonusNote += $" (Last Stand +{Player.lastStandBonus})";
                 Log($"Player dealt {dmg} damage{bonusNote}");
             }
         }
@@ -93,13 +102,11 @@ public class CombatManager : MonoBehaviour
             {
                 int incoming = Mathf.Max(Enemy.damage - Player.damageReduction, 1);
                 Player.hp -= incoming;
-                string reductionNote = Player.damageReduction > 0
-                    ? $" (Thick Skin -{Player.damageReduction})" : "";
+                string reductionNote = Player.damageReduction > 0 ? $" (Thick Skin -{Player.damageReduction})" : "";
                 Log($"Enemy dealt {incoming} damage{reductionNote}");
             }
         }
 
-        // Regenerate 1 block use on turns where player didn't defend
         if (!playerDefends)
             Player.blockUses = Mathf.Min(Player.blockUses + 1, Player.maxBlockUses);
 
@@ -111,9 +118,15 @@ public class CombatManager : MonoBehaviour
         if (Player.hp <= 0 || Enemy.hp <= 0)
         {
             battleOver = true;
-            bool playerWon = Enemy.hp <= 0 && Player.hp > 0;
-            OnBattleEnd?.Invoke(playerWon);
+            OnBattleEnd?.Invoke(Enemy.hp <= 0 && Player.hp > 0);
         }
+    }
+
+    // Convenience: decide + apply in one call (used outside of animation flow)
+    public void ResolveTurn(CombatAction playerAction)
+    {
+        DecideActions(playerAction);
+        ApplyTurn();
     }
 
     void ApplyPlayerAction(CombatAction action, CombatAction enemyAction)
@@ -123,27 +136,16 @@ public class CombatManager : MonoBehaviour
             case CombatAction.Fire:
                 Player.bullets--;
                 break;
-
             case CombatAction.Reload:
                 int gained = 1 + Player.reloadBonus;
                 Player.bullets = Mathf.Min(Player.bullets + gained, Player.maxBullets);
                 string reloadMsg = $"Player reloaded (+{gained})";
-                if (Player.reloadHeal > 0)
-                {
-                    Player.hp = Mathf.Min(Player.hp + Player.reloadHeal, Player.maxHp);
-                    reloadMsg += $", healed {Player.reloadHeal} HP";
-                }
+                if (Player.reloadHeal > 0) { Player.hp = Mathf.Min(Player.hp + Player.reloadHeal, Player.maxHp); reloadMsg += $", healed {Player.reloadHeal} HP"; }
                 Log(reloadMsg);
                 break;
-
             case CombatAction.Defend:
-                if (Player.defendHeal > 0)
-                {
-                    Player.hp = Mathf.Min(Player.hp + Player.defendHeal, Player.maxHp);
-                    Log($"Player defended and healed {Player.defendHeal} HP");
-                }
-                else
-                    Log("Player defended");
+                if (Player.defendHeal > 0) { Player.hp = Mathf.Min(Player.hp + Player.defendHeal, Player.maxHp); Log($"Player defended and healed {Player.defendHeal} HP"); }
+                else Log("Player defended");
                 break;
         }
     }
@@ -152,16 +154,9 @@ public class CombatManager : MonoBehaviour
     {
         switch (action)
         {
-            case CombatAction.Fire:
-                Enemy.bullets--;
-                break;
-            case CombatAction.Reload:
-                Enemy.bullets = Mathf.Min(Enemy.bullets + 1, Enemy.maxBullets);
-                Log("Enemy reloaded");
-                break;
-            case CombatAction.Defend:
-                Log("Enemy defended");
-                break;
+            case CombatAction.Fire:   Enemy.bullets--; break;
+            case CombatAction.Reload: Enemy.bullets = Mathf.Min(Enemy.bullets + 1, Enemy.maxBullets); Log("Enemy reloaded"); break;
+            case CombatAction.Defend: Log("Enemy defended"); break;
         }
     }
 
