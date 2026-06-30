@@ -7,12 +7,13 @@ using TMPro;
 public class MapRenderer : MonoBehaviour
 {
     public RectTransform mapContainer;
+    public ScrollRect scrollRect;
 
-    const float COL_SPACING   = 185f;
-    const float ROW_SPACING   = 78f;
-    const float NODE_SIZE     = 46f;
-    const float LINE_W        = 3.5f;
-    const float LABEL_DY      = -40f;
+    const float COL_SPACING   = 240f;
+    const float ROW_SPACING   = 165f;
+    const float NODE_SIZE     = 92f;
+    const float LINE_W        = 5f;
+    const float LABEL_DY      = -82f;
 
     static readonly Color C_WEAK   = new Color(0.20f, 0.45f, 0.82f);
     static readonly Color C_NORMAL = new Color(0.88f, 0.48f, 0.10f);
@@ -51,6 +52,11 @@ public class MapRenderer : MonoBehaviour
                 }
             }
         }
+
+        // Auto-scroll so current floor is visible (0 = bottom, 1 = top)
+        if (scrollRect != null && total > 1)
+            scrollRect.verticalNormalizedPosition =
+                (float)currentFloor / (total - 1);
 
         // ── Nodes (on top) ───────────────────────────────────────────────────
         for (int row = 0; row < total; row++)
@@ -165,7 +171,7 @@ public class MapRenderer : MonoBehaviour
             : new Color(0.45f, 0.45f, 0.45f, isPast ? 0.45f : 0.6f);
 
         SpawnLabel(PathData.EnemyLabel(path.enemyTier),
-                   new Vector2(pos.x, pos.y + LABEL_DY), labelCol, 13f);
+                   new Vector2(pos.x, pos.y + LABEL_DY), labelCol, 17f);
 
         // Current floor: add transparent button overlay
         if (clickable)
@@ -190,7 +196,7 @@ public class MapRenderer : MonoBehaviour
         var rt = go.AddComponent<RectTransform>();
         rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = pos;
-        rt.sizeDelta = new Vector2(130f, 26f);
+        rt.sizeDelta = new Vector2(180f, 32f);
         var tmp = go.AddComponent<TextMeshProUGUI>();
         tmp.text      = text;
         tmp.fontSize  = fontSize;

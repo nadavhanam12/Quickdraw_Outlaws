@@ -27,6 +27,7 @@ public class UIManager : MonoBehaviour
     public Button fireButton;
     public Button defendButton;
     public Button reloadButton;
+    public TextMeshProUGUI blockUsesText;
     public TextMeshProUGUI combatLogText;
 
     [Header("Loot UI")]
@@ -164,7 +165,11 @@ public class UIManager : MonoBehaviour
         enemyHpText.text       = $"HP: {e.hp} / {e.maxHp}";
         enemyBulletsText.text  = $"Bullets: {e.bullets} / {e.maxBullets}";
 
-        fireButton.interactable = !battleEnded;
+        if (blockUsesText != null)
+            blockUsesText.text = $"Shield: {p.blockUses} / {p.maxBlockUses}";
+
+        fireButton.interactable   = !battleEnded;
+        defendButton.interactable = !battleEnded && p.blockUses > 0;
     }
 
     void AddLog(string msg)
@@ -177,8 +182,9 @@ public class UIManager : MonoBehaviour
     void SetActionButtonsInteractable(bool value)
     {
         fireButton.interactable   = value;
-        defendButton.interactable = value;
         reloadButton.interactable = value;
+        // defendButton interactability is managed by RefreshCombatUI (block uses gate)
+        if (!value) defendButton.interactable = false;
     }
 
     void SetScreen(GameObject screen)

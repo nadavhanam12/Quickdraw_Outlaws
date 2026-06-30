@@ -45,12 +45,19 @@ public class CombatManager : MonoBehaviour
         if (playerAction == CombatAction.Fire && Player.bullets <= 0)
             playerAction = CombatAction.Reload;
 
+        if (playerAction == CombatAction.Defend && Player.blockUses <= 0)
+            playerAction = CombatAction.Reload;
+
         CombatAction enemyAction = GetEnemyAction();
         if (enemyAction == CombatAction.Fire && Enemy.bullets <= 0)
             enemyAction = CombatAction.Reload;
 
-        bool playerFires = playerAction == CombatAction.Fire;
-        bool enemyFires  = enemyAction  == CombatAction.Fire;
+        bool playerFires   = playerAction == CombatAction.Fire;
+        bool enemyFires    = enemyAction  == CombatAction.Fire;
+        bool playerDefends = playerAction == CombatAction.Defend;
+
+        if (playerDefends)
+            Player.blockUses--;
 
         ApplyPlayerAction(playerAction, enemyAction);
         ApplyEnemyAction(enemyAction);
@@ -91,6 +98,10 @@ public class CombatManager : MonoBehaviour
                 Log($"Enemy dealt {incoming} damage{reductionNote}");
             }
         }
+
+        // Regenerate 1 block use on turns where player didn't defend
+        if (!playerDefends)
+            Player.blockUses = Mathf.Min(Player.blockUses + 1, Player.maxBlockUses);
 
         Player.hp = Mathf.Max(Player.hp, 0);
         Enemy.hp  = Mathf.Max(Enemy.hp,  0);

@@ -27,6 +27,9 @@ public class PlayerStats
     public int  lastStandBonus;        // 16: Last Stand
     // 17: Hired Muscle → maxHp += 15  (no new field)
 
+    public int blockUses;
+    public int maxBlockUses = 3;
+
     public int gold;
 
     public bool firstShotFired;
@@ -45,6 +48,7 @@ public class PlayerStats
     {
         maxBullets = 6 + maxBulletsBonus;
         bullets    = Mathf.Min(startingBullets, maxBullets);
+        blockUses  = maxBlockUses;
         firstShotFired = false;
         if (battleStartHeal > 0)
             hp = Mathf.Min(hp + battleStartHeal, maxHp);
