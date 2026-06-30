@@ -29,6 +29,7 @@ public class UIManager : MonoBehaviour
     public Button reloadButton;
     public TextMeshProUGUI blockUsesText;
     public TextMeshProUGUI combatLogText;
+    public BattleVisuals battleVisuals;
 
     [Header("Loot UI")]
     public TextMeshProUGUI lootTitleText;
@@ -81,9 +82,12 @@ public class UIManager : MonoBehaviour
         SetScreen(combatScreen);
         battleEnded = false;
         logLines.Clear();
-        combatLogText.text = "";
-        selectedActionText.text = "Select an action";
+        if (combatLogText != null) combatLogText.text = "";
+        if (selectedActionText != null) selectedActionText.text = "Select an action";
         SetActionButtonsInteractable(true);
+
+        if (battleVisuals != null && GameManager.Instance.LastPath != null)
+            battleVisuals.SetEnemyTier(GameManager.Instance.LastPath.enemyTier);
 
         var cm = CombatManager.Instance;
         cm.OnCombatLog    += AddLog;
@@ -160,23 +164,23 @@ public class UIManager : MonoBehaviour
         var e = CombatManager.Instance.Enemy;
         if (p == null || e == null) return;
 
-        playerHpText.text      = $"HP: {p.hp} / {p.maxHp}";
-        playerBulletsText.text = $"Bullets: {p.bullets} / {p.maxBullets}";
-        enemyHpText.text       = $"HP: {e.hp} / {e.maxHp}";
-        enemyBulletsText.text  = $"Bullets: {e.bullets} / {e.maxBullets}";
-
-        if (blockUsesText != null)
-            blockUsesText.text = $"Shield: {p.blockUses} / {p.maxBlockUses}";
+        if (playerHpText != null)      playerHpText.text      = $"HP: {p.hp} / {p.maxHp}";
+        if (playerBulletsText != null) playerBulletsText.text = $"Bullets: {p.bullets} / {p.maxBullets}";
+        if (enemyHpText != null)       enemyHpText.text       = $"HP: {e.hp} / {e.maxHp}";
+        if (enemyBulletsText != null)  enemyBulletsText.text  = $"Bullets: {e.bullets} / {e.maxBullets}";
+        if (blockUsesText != null)     blockUsesText.text     = $"Shield: {p.blockUses} / {p.maxBlockUses}";
 
         fireButton.interactable   = !battleEnded;
         defendButton.interactable = !battleEnded && p.blockUses > 0;
+
+        battleVisuals?.Refresh(p, e);
     }
 
     void AddLog(string msg)
     {
         logLines.Add(msg);
         if (logLines.Count > 12) logLines.RemoveAt(0);
-        combatLogText.text = string.Join("\n", logLines);
+        if (combatLogText != null) combatLogText.text = string.Join("\n", logLines);
     }
 
     void SetActionButtonsInteractable(bool value)

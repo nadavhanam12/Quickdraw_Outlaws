@@ -91,48 +91,85 @@ public static class RoguelikeSceneSetup
         scrollRect.viewport = vpRT;
         scrollRect.content  = contentRT;
 
-        // ── COMBAT ────────────────────────────────────────────────────────────
-        var ep = SzPanel(combatGO.transform, "EnemyPanel",
-            new Color(0.35f, 0.08f, 0.08f, 0.85f), V2(0, 298), V2(800, 78));
-        Txt(ep.transform, "EL", "ENEMY", 12f, V2(0, 22), V2(780, 22),
-            new Color(1f, 0.5f, 0.5f, 1f), TextAlignmentOptions.Center);
-        var enemyHpTMP  = Txt(ep.transform, "EnemyHP",      "HP: 100 / 100", 22f,
-            V2(-178, -4), V2(330, 44), Color.white, TextAlignmentOptions.Center);
-        var enemyBulTMP = Txt(ep.transform, "EnemyBullets", "Bullets: 0 / 6", 22f,
-            V2(178,  -4), V2(280, 44), new Color(1f, 0.9f, 0.3f, 1f), TextAlignmentOptions.Center);
+        // ── COMBAT (Setup A – Classic Duel) ───────────────────────────────────
 
+        // — Player (left) —
+        var playerImg = ImgSlot(combatGO.transform, "PlayerSprite",
+            V2(-320f, 55f), V2(250f, 330f), new Color(0.25f, 0.35f, 0.25f, 0.5f));
+        playerImg.preserveAspect = true;
+
+        Txt(combatGO.transform, "PlayerLabel", "THE OUTLAW",
+            16f, V2(-320f, 240f), V2(250f, 28f),
+            new Color(0.4f, 1f, 0.4f, 1f), TextAlignmentOptions.Center);
+
+        var playerHpFill = HpBarFill(combatGO.transform, "PlayerHpBar",
+            V2(-320f, -120f), V2(250f, 20f));
+
+        var playerHpTMP = Txt(combatGO.transform, "PlayerHP", "HP: 100 / 100",
+            11f, V2(-320f, -120f), V2(250f, 20f),
+            Color.white, TextAlignmentOptions.Center);
+
+        var playerBullets = IconRow(combatGO.transform, "PlayerBullet",
+            V2(-320f, -152f), 6, 35f, 26f, new Color(1f, 0.88f, 0.2f, 1f));
+
+        var playerShields = IconRow(combatGO.transform, "PlayerShield",
+            V2(-320f, -188f), 3, 42f, 26f, new Color(0.35f, 0.65f, 1f, 1f));
+
+        var playerBulTMP = Txt(combatGO.transform, "PlayerBulletsText", "",
+            8f, V2(-320f, -218f), V2(200f, 18f),
+            new Color(0.5f, 0.5f, 0.5f, 0.4f), TextAlignmentOptions.Center);
+
+        // — Enemy (right) —
+        var enemyImg = ImgSlot(combatGO.transform, "EnemySprite",
+            V2(320f, 55f), V2(250f, 330f), new Color(0.35f, 0.15f, 0.15f, 0.5f));
+        enemyImg.preserveAspect = true;
+        enemyImg.transform.localScale = new Vector3(-1f, 1f, 1f);
+
+        var enemyTierTMP = Txt(combatGO.transform, "EnemyLabel", "ENEMY",
+            16f, V2(320f, 240f), V2(250f, 28f),
+            new Color(1f, 0.4f, 0.4f, 1f), TextAlignmentOptions.Center);
+
+        var enemyHpFill = HpBarFill(combatGO.transform, "EnemyHpBar",
+            V2(320f, -120f), V2(250f, 20f));
+
+        var enemyHpTMP = Txt(combatGO.transform, "EnemyHP", "HP: 100 / 100",
+            11f, V2(320f, -120f), V2(250f, 20f),
+            Color.white, TextAlignmentOptions.Center);
+
+        var enemyBullets = IconRow(combatGO.transform, "EnemyBullet",
+            V2(320f, -152f), 6, 35f, 26f, new Color(1f, 0.88f, 0.2f, 1f));
+
+        var enemyBulTMP = Txt(combatGO.transform, "EnemyBulletsText", "",
+            8f, V2(320f, -188f), V2(200f, 18f),
+            new Color(0.5f, 0.5f, 0.5f, 0.4f), TextAlignmentOptions.Center);
+
+        // — Center: combat log —
         var lp = SzPanel(combatGO.transform, "LogPanel",
-            new Color(0f, 0f, 0f, 0.55f), V2(0, 65), V2(800, 258));
+            new Color(0f, 0f, 0f, 0.55f), V2(0f, 28f), V2(280f, 250f));
         var logGO = new GameObject("CombatLog");
         logGO.transform.SetParent(lp.transform, false);
         var logRT  = logGO.AddComponent<RectTransform>();
         logRT.anchorMin = Vector2.zero; logRT.anchorMax = Vector2.one;
-        logRT.offsetMin = V2(10, 8);    logRT.offsetMax  = V2(-10, -8);
+        logRT.offsetMin = V2(10, 8);   logRT.offsetMax  = V2(-10, -8);
         var logTMP = logGO.AddComponent<TextMeshProUGUI>();
-        logTMP.fontSize         = 15f;
+        logTMP.fontSize         = 14f;
         logTMP.color            = new Color(0.88f, 0.88f, 0.88f, 1f);
         logTMP.alignment        = TextAlignmentOptions.TopLeft;
         logTMP.textWrappingMode = TextWrappingModes.Normal;
         logTMP.overflowMode     = TextOverflowModes.Truncate;
 
-        var selTMP    = Txt(combatGO.transform, "SelectedAction", "Select an action",
-            20f, V2(0, -90), V2(600, 36), new Color(0.8f, 0.9f, 1f, 1f), TextAlignmentOptions.Center);
-        var fireBtn   = Btn(combatGO.transform, "FireButton",   "FIRE",   V2(-245, -158), V2(205, 58), new Color(0.55f, 0.13f, 0.13f, 1f));
-        var defendBtn = Btn(combatGO.transform, "DefendButton", "DEFEND", V2(0,    -158), V2(205, 58), new Color(0.13f, 0.33f, 0.55f, 1f));
-        var reloadBtn = Btn(combatGO.transform, "ReloadButton", "RELOAD", V2(245,  -158), V2(205, 58), new Color(0.13f, 0.45f, 0.13f, 1f));
+        var selTMP = Txt(combatGO.transform, "SelectedAction", "Select an action",
+            18f, V2(0f, -228f), V2(350f, 30f),
+            new Color(0.8f, 0.9f, 1f, 1f), TextAlignmentOptions.Center);
 
-        // Shield uses display — below the Defend button
+        // — Action buttons (bottom) —
+        var fireBtn   = Btn(combatGO.transform, "FireButton",   "FIRE",   V2(-255f, -285f), V2(210f, 55f), new Color(0.55f, 0.13f, 0.13f, 1f));
+        var defendBtn = Btn(combatGO.transform, "DefendButton", "DEFEND", V2(0f,    -285f), V2(210f, 55f), new Color(0.13f, 0.33f, 0.55f, 1f));
+        var reloadBtn = Btn(combatGO.transform, "ReloadButton", "RELOAD", V2(255f,  -285f), V2(210f, 55f), new Color(0.13f, 0.45f, 0.13f, 1f));
+
         var blockTMP = Txt(combatGO.transform, "BlockUsesText", "Shield: 3 / 3",
-            15f, V2(0, -204), V2(200, 28), new Color(0.45f, 0.70f, 1f, 1f), TextAlignmentOptions.Center);
-
-        var pp = SzPanel(combatGO.transform, "PlayerPanel",
-            new Color(0.08f, 0.30f, 0.08f, 0.85f), V2(0, -298), V2(800, 78));
-        Txt(pp.transform, "PL", "PLAYER", 12f, V2(0, 22), V2(780, 22),
-            new Color(0.5f, 1f, 0.5f, 1f), TextAlignmentOptions.Center);
-        var playerHpTMP  = Txt(pp.transform, "PlayerHP",      "HP: 100 / 100", 22f,
-            V2(-178, -4), V2(330, 44), Color.white, TextAlignmentOptions.Center);
-        var playerBulTMP = Txt(pp.transform, "PlayerBullets", "Bullets: 0 / 6", 22f,
-            V2(178,  -4), V2(280, 44), new Color(1f, 0.9f, 0.3f, 1f), TextAlignmentOptions.Center);
+            14f, V2(0f, -330f), V2(210f, 28f),
+            new Color(0.45f, 0.70f, 1f, 1f), TextAlignmentOptions.Center);
 
         // ── LOOT SCREEN ───────────────────────────────────────────────────────
         var lootTitleTMP = Txt(upgradeGO.transform, "LootTitle", "LOOT",
@@ -189,6 +226,17 @@ public static class RoguelikeSceneSetup
         SetF(uiMgr, "upgradeButtonTexts", new TextMeshProUGUI[] { upgTxt1, upgTxt2, upgTxt3 });
         SetF(uiMgr, "gameOverText",       goTMP);
         SetF(uiMgr, "restartButton",      restartBtn);
+
+        var bv = mgrsGO.AddComponent<BattleVisuals>();
+        SetF(bv,    "playerSprite",       playerImg);
+        SetF(bv,    "enemySprite",        enemyImg);
+        SetF(bv,    "enemyTierLabel",     enemyTierTMP);
+        SetF(bv,    "playerHpFill",       playerHpFill);
+        SetF(bv,    "enemyHpFill",        enemyHpFill);
+        SetF(bv,    "playerBulletIcons",  playerBullets);
+        SetF(bv,    "enemyBulletIcons",   enemyBullets);
+        SetF(bv,    "shieldIcons",        playerShields);
+        SetF(uiMgr, "battleVisuals",      bv);
 
         mapGO.SetActive(true);
         combatGO.SetActive(false);
@@ -268,5 +316,54 @@ public static class RoguelikeSceneSetup
             BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
         if (f != null) f.SetValue(c, value);
         else Debug.LogWarning($"[Setup] Field not found: {c.GetType().Name}.{field}");
+    }
+
+    static Image ImgSlot(Transform parent, string name, Vector2 pos, Vector2 size, Color placeholder)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+        var rt = (RectTransform)go.transform;
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = pos; rt.sizeDelta = size;
+        var img = go.AddComponent<Image>();
+        img.color = placeholder;
+        return img;
+    }
+
+    static Image HpBarFill(Transform parent, string name, Vector2 pos, Vector2 size)
+    {
+        var bgGO = SzPanel(parent, name, new Color(0.20f, 0.05f, 0.05f, 1f), pos, size);
+        var fillGO = new GameObject("Fill", typeof(RectTransform));
+        fillGO.transform.SetParent(bgGO.transform, false);
+        var fillRT = (RectTransform)fillGO.transform;
+        fillRT.anchorMin = Vector2.zero; fillRT.anchorMax = Vector2.one;
+        fillRT.offsetMin = Vector2.zero; fillRT.offsetMax = Vector2.zero;
+        var fill = fillGO.AddComponent<Image>();
+        fill.color = new Color(0.18f, 0.78f, 0.28f, 1f);
+        fill.type = Image.Type.Filled;
+        fill.fillMethod = Image.FillMethod.Horizontal;
+        fill.fillOrigin = (int)Image.OriginHorizontal.Left;
+        fill.fillAmount = 1f;
+        return fill;
+    }
+
+    static Image[] IconRow(Transform parent, string name, Vector2 center,
+        int count, float spacing, float iconSize, Color color)
+    {
+        var icons = new Image[count];
+        float halfSpan = (count - 1) * spacing * 0.5f;
+        for (int i = 0; i < count; i++)
+        {
+            var go = new GameObject($"{name}_{i}", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = new Vector2(center.x - halfSpan + i * spacing, center.y);
+            rt.sizeDelta = new Vector2(iconSize, iconSize);
+            var img = go.AddComponent<Image>();
+            img.color = color;
+            icons[i] = img;
+        }
+        return icons;
     }
 }
