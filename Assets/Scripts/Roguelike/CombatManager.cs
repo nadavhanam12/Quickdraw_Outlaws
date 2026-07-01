@@ -9,8 +9,10 @@ public class CombatManager : MonoBehaviour
 
     public PlayerStats   Player           { get; private set; }
     public EnemyStats    Enemy            { get; private set; }
-    public CombatAction? LastPlayerAction { get; private set; }
-    public CombatAction? LastEnemyAction  { get; private set; }
+    public CombatAction? LastPlayerAction  { get; private set; }
+    public CombatAction? LastEnemyAction   { get; private set; }
+    public int           LastPlayerAimBonus { get; private set; }
+    public int           LastEnemyAimBonus  { get; private set; }
 
     public event Action<string> OnCombatLog;
     public event Action         OnTurnResolved;
@@ -53,8 +55,10 @@ public class CombatManager : MonoBehaviour
         CombatAction enemyAction = GetEnemyAction();
         if (enemyAction == CombatAction.Fire && Enemy.bullets <= 0) enemyAction = CombatAction.Reload;
 
-        LastPlayerAction = playerAction;
-        LastEnemyAction  = enemyAction;
+        LastPlayerAction   = playerAction;
+        LastEnemyAction    = enemyAction;
+        LastPlayerAimBonus = playerAction == CombatAction.Fire ? rng.Next(0, 6) : 0;
+        LastEnemyAimBonus  = enemyAction  == CombatAction.Fire ? rng.Next(0, 6) : 0;
     }
 
     // Phase 2: apply the decided actions and fire events
@@ -78,7 +82,7 @@ public class CombatManager : MonoBehaviour
         {
             bool enemyEmpty     = Enemy.bullets == 0 && enemyAction != CombatAction.Fire;
             bool enemyReloading = enemyAction == CombatAction.Reload;
-            int  dmg            = Player.GetFireDamage(enemyEmpty, enemyReloading);
+            int  dmg            = Player.GetFireDamage(enemyEmpty, enemyReloading) + LastPlayerAimBonus;
             Player.MarkFirstShot();
 
             if (enemyAction == CombatAction.Defend)
@@ -100,7 +104,7 @@ public class CombatManager : MonoBehaviour
                 Log("Player blocked Enemy's shot");
             else
             {
-                int incoming = Mathf.Max(Enemy.damage - Player.damageReduction, 1);
+                int incoming = Mathf.Max(Enemy.damage + LastEnemyAimBonus - Player.damageReduction, 1);
                 Player.hp -= incoming;
                 string reductionNote = Player.damageReduction > 0 ? $" (Thick Skin -{Player.damageReduction})" : "";
                 Log($"Enemy dealt {incoming} damage{reductionNote}");

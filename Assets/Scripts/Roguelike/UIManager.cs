@@ -45,6 +45,9 @@ public class UIManager : MonoBehaviour
     [Header("Transitions")]
     public Image transitionOverlay;
 
+    [Header("Aim Icons")]
+    public Sprite[] aimRankSprites; // 0 = bad (0-1), 1 = medium (2-3), 2 = good (4-5)
+
     [Header("Bullet FX")]
     public Image         playerBulletImage;
     public Image         enemyBulletImage;
@@ -540,15 +543,22 @@ public class UIManager : MonoBehaviour
 
         yield return new WaitForSeconds(1.0f); // lean-back phase
 
-        // Muzzle flash + shooter sprite flash orange (synced with snap-forward)
-        if (pFires) { StartCoroutine(MuzzleFlash(pTip)); if (pSpr) StartCoroutine(FlashColor(pSpr, new Color(1f, 0.55f, 0.15f))); }
-        if (eFires) { StartCoroutine(MuzzleFlash(eTip)); if (eSpr) StartCoroutine(FlashColor(eSpr, new Color(1f, 0.55f, 0.15f))); }
-
-        yield return new WaitForSeconds(0.13f);
-
-        // Bullets travel from gun tip to target's hit marker
-        if (pFires) StartCoroutine(BulletFly(playerBulletImage, pTip, eHit));
-        if (eFires) StartCoroutine(BulletFly(enemyBulletImage,  eTip, pHit));
+        // Snap moment: muzzle flash + bullet + aim popup all fire together
+        var cm2 = CombatManager.Instance;
+        if (pFires)
+        {
+            StartCoroutine(MuzzleFlash(pTip));
+            if (pSpr) StartCoroutine(FlashColor(pSpr, new Color(1f, 0.55f, 0.15f)));
+            StartCoroutine(BulletFly(playerBulletImage, pTip, eHit));
+            StartCoroutine(AimBonusPopup(cm2.LastPlayerAimBonus, pTip));
+        }
+        if (eFires)
+        {
+            StartCoroutine(MuzzleFlash(eTip));
+            if (eSpr) StartCoroutine(FlashColor(eSpr, new Color(1f, 0.55f, 0.15f)));
+            StartCoroutine(BulletFly(enemyBulletImage, eTip, pHit));
+            StartCoroutine(AimBonusPopup(cm2.LastEnemyAimBonus, eTip));
+        }
 
         yield return new WaitForSeconds(0.3f);
 
@@ -791,6 +801,84 @@ public class UIManager : MonoBehaviour
         for (float f = 0; f < fadeOut; f += Time.deltaTime) { c.a = 1f - f / fadeOut; overlay.color = c; yield return null; }
         c.a = 0f; overlay.color = c;
         overlay.gameObject.SetActive(false);
+    }
+
+    IEnumerator AimBonusPopup(int bonus, Vector2 pos)
+    {
+        int rankIdx = bonus <= 1 ? 0 : bonus <= 3 ? 1 : 2;
+
+        // ── Icon ──────────────────────────────────────────────────────────
+        GameObject iconGo = null;
+        RectTransform iconRt = null;
+        Image iconImg = null;
+        if (aimRankSprites != null && aimRankSprites.Length == 3 && aimRankSprites[rankIdx] != null)
+        {
+            iconGo = new GameObject("AimIcon", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            iconGo.transform.SetParent(combatScreen.transform, false);
+            iconRt = iconGo.GetComponent<RectTransform>();
+            iconRt.anchorMin = iconRt.anchorMax = new Vector2(0.5f, 0.5f);
+            iconRt.pivot     = Vector2.one * 0.5f;
+            iconRt.anchoredPosition = pos + new Vector2(0f, 20f);
+            iconRt.sizeDelta = new Vector2(84f, 84f);
+            iconImg = iconGo.GetComponent<Image>();
+            iconImg.sprite = aimRankSprites[rankIdx];
+        }
+
+        // ── Bonus text (only if > 0) ──────────────────────────────────────
+        GameObject textGo = null;
+        RectTransform textRt = null;
+        TextMeshProUGUI tmp = null;
+        if (bonus > 0)
+        {
+            textGo = new GameObject("AimBonus", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            textGo.transform.SetParent(combatScreen.transform, false);
+            textRt = textGo.GetComponent<RectTransform>();
+            textRt.anchorMin = textRt.anchorMax = new Vector2(0.5f, 0.5f);
+            textRt.pivot     = Vector2.one * 0.5f;
+            textRt.anchoredPosition = pos + new Vector2(60f, 20f);
+            textRt.sizeDelta = new Vector2(200f, 120f);
+            tmp = textGo.GetComponent<TextMeshProUGUI>();
+            tmp.text      = $"+{bonus}";
+            tmp.color     = new Color(1f, 0.95f, 0.2f, 1f);
+            tmp.fontSize  = 84f;
+            tmp.fontStyle = FontStyles.Bold;
+            tmp.alignment = TextAlignmentOptions.Center;
+        }
+
+        // ── Punch scale in ────────────────────────────────────────────────
+        float punchDur = 0.15f;
+        for (float f = 0; f < punchDur; f += Time.deltaTime)
+        {
+            float s = Mathf.Lerp(0f, 1.3f, f / punchDur);
+            if (iconGo)  iconGo.transform.localScale  = Vector3.one * s;
+            if (textGo)  textGo.transform.localScale  = Vector3.one * s;
+            yield return null;
+        }
+        if (iconGo)  iconGo.transform.localScale  = Vector3.one;
+        if (textGo)  textGo.transform.localScale  = Vector3.one;
+
+        // ── Hold then float up + fade ─────────────────────────────────────
+        yield return new WaitForSeconds(0.25f);
+
+        float fadeDur  = 0.6f;
+        Vector2 iconStart = iconRt  != null ? iconRt.anchoredPosition  : Vector2.zero;
+        Vector2 textStart = textRt  != null ? textRt.anchoredPosition  : Vector2.zero;
+
+        for (float f = 0; f < fadeDur; f += Time.deltaTime)
+        {
+            float t = f / fadeDur;
+            float rise = 70f * t;
+            float alpha = 1f - t;
+
+            if (iconRt  != null) iconRt.anchoredPosition  = iconStart  + new Vector2(0f, rise);
+            if (textRt  != null) textRt.anchoredPosition  = textStart  + new Vector2(0f, rise);
+            if (iconImg != null) { Color c = iconImg.color; c.a = alpha; iconImg.color = c; }
+            if (tmp     != null) { Color c = tmp.color;     c.a = alpha; tmp.color     = c; }
+            yield return null;
+        }
+
+        if (iconGo) Destroy(iconGo);
+        if (textGo) Destroy(textGo);
     }
 
     IEnumerator FloatDamageText(string text, Vector2 pos, Color color)
