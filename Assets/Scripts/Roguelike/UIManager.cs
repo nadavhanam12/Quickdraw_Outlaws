@@ -27,8 +27,10 @@ public class UIManager : MonoBehaviour
     public Sprite[]        actionSprites; // 0=Fire, 1=Defend, 2=Reload (matches CombatAction enum)
     public TextMeshProUGUI playerHpText;
     public TextMeshProUGUI playerBulletsText;
+    public TextMeshProUGUI playerDamageText;
     public TextMeshProUGUI enemyHpText;
     public TextMeshProUGUI enemyBulletsText;
+    public TextMeshProUGUI enemyDamageText;
     public TextMeshProUGUI selectedActionText;
     public Button fireButton;
     public Button defendButton;
@@ -275,8 +277,10 @@ public class UIManager : MonoBehaviour
 
         if (playerHpText      != null) playerHpText.text      = $"{p.hp} / {p.maxHp}";
         if (playerBulletsText != null) playerBulletsText.text = $"Bullets: {p.bullets} / {p.maxBullets}";
+        if (playerDamageText  != null) playerDamageText.text  = $"DMG  {30 + p.fireDamageBonus}";
         if (enemyHpText       != null) enemyHpText.text       = $"{e.hp} / {e.maxHp}";
         if (enemyBulletsText  != null) enemyBulletsText.text  = $"Bullets: {e.bullets} / {e.maxBullets}";
+        if (enemyDamageText   != null) enemyDamageText.text   = $"DMG  {e.damage}";
         if (blockUsesText     != null) blockUsesText.text     = $"Shield: {p.blockUses} / {p.maxBlockUses}";
 
         fireButton.interactable   = !battleEnded;

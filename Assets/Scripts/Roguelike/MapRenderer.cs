@@ -200,19 +200,18 @@ public class MapRenderer : MonoBehaviour
         SpawnLabel(PathData.EnemyLabel(path.enemyTier),
                    new Vector2(pos.x, pos.y + LABEL_DY), labelCol, 17f);
 
-        // Button overlay for clickable nodes
+        // Button directly on the node so the click animation scales the visible sprite
         if (clickable)
         {
-            var btnGO = new GameObject($"Btn_{col}");
-            btnGO.transform.SetParent(mapContainer, false);
-            var bRT = btnGO.AddComponent<RectTransform>();
-            bRT.anchorMin        = bRT.anchorMax = new Vector2(0.5f, 0.5f);
-            bRT.anchoredPosition = pos;
-            bRT.sizeDelta        = new Vector2(NODE_SIZE * 1.5f, NODE_SIZE * 1.5f);
-            btnGO.AddComponent<Image>().color = Color.clear;
-            var btn = btnGO.AddComponent<Button>();
+            nRT.sizeDelta = new Vector2(NODE_SIZE * 1.5f, NODE_SIZE * 1.5f); // larger hit area
+            var btn = nodeGO.AddComponent<Button>();
+            nodeGO.AddComponent<ButtonClickAnimation>();
             int cap = col;
             btn.onClick.AddListener(() => OnColumnChosen?.Invoke(cap));
+        }
+        else
+        {
+            img.raycastTarget = false; // non-clickable nodes don't block input
         }
     }
 
