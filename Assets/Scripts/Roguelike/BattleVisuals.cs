@@ -41,7 +41,9 @@ public class BattleVisuals : MonoBehaviour
     static readonly Color ShieldFull  = new Color(0.35f, 0.65f, 1f,    1f);
     static readonly Color ShieldEmpty = new Color(0.15f, 0.22f, 0.35f, 1f);
 
-    public void SetEnemyTier(PathData.EnemyTier tier)
+    public static string GetRandomEnemyName() => EnemyNames[Random.Range(0, EnemyNames.Length)];
+
+    public void SetEnemyTier(PathData.EnemyTier tier, string forcedName = null)
     {
         int idx = (int)tier;
         if (enemySprite != null && enemyTierSprites != null && idx < enemyTierSprites.Length)
@@ -51,10 +53,7 @@ public class BattleVisuals : MonoBehaviour
         }
 
         if (enemyTierLabel != null)
-        {
-            string randomName = EnemyNames[Random.Range(0, EnemyNames.Length)];
-            enemyTierLabel.text = randomName;
-        }
+            enemyTierLabel.text = forcedName ?? GetRandomEnemyName();
     }
 
     public void Refresh(PlayerStats p, EnemyStats e)

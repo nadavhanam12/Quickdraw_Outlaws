@@ -13,6 +13,8 @@ public class UIManager : MonoBehaviour
     public GameObject combatScreen;
     public GameObject lootScreen;
     public GameObject gameOverScreen;
+    public GameObject battleIntroScreen;
+    public GameObject battleResultScreen;
 
     [Header("Map UI")]
     public MapRenderer mapRenderer;
@@ -61,6 +63,16 @@ public class UIManager : MonoBehaviour
     public RectTransform playerHitMarker;
     public RectTransform enemyHitMarker;
 
+    [Header("Battle Intro / Result")]
+    public Image           battleIntroTierImage;
+    public Image           battleIntroEnemyImage;
+    public TextMeshProUGUI battleIntroNameText;
+    public Image           battleResultTierImage;
+    public Image           battleResultEnemyImage;
+    public TextMeshProUGUI battleResultNameText;
+    public TextMeshProUGUI battleResultOutcomeText;
+    public TextMeshProUGUI battleResultInfoText;
+
     [Header("Loot UI")]
     public TextMeshProUGUI lootTitleText;
     public TextMeshProUGUI lootInfoText;
@@ -75,6 +87,7 @@ public class UIManager : MonoBehaviour
     private List<string> logLines = new List<string>();
     private bool battleEnded;
     private bool _animating;
+    private string _currentEnemyName;
 
     void Awake() => Instance = this;
 
@@ -132,7 +145,7 @@ public class UIManager : MonoBehaviour
         SetActionButtonsInteractable(true);
 
         if (battleVisuals != null && GameManager.Instance.LastPath != null)
-            battleVisuals.SetEnemyTier(GameManager.Instance.LastPath.enemyTier);
+            battleVisuals.SetEnemyTier(GameManager.Instance.LastPath.enemyTier, _currentEnemyName);
 
         var cm = CombatManager.Instance;
         cm.OnCombatLog    += AddLog;
@@ -175,6 +188,92 @@ public class UIManager : MonoBehaviour
             }
             else upgradeButtons[i].gameObject.SetActive(false);
         }
+    }
+
+    public void ShowBattleIntro()
+    {
+        _currentEnemyName = BattleVisuals.GetRandomEnemyName();
+        PopulateEnemyVisuals(battleIntroTierImage, battleIntroEnemyImage, battleIntroNameText);
+        StartCoroutine(BattleScreenRoutine(battleIntroScreen, 1.5f, () => ShowCombat()));
+    }
+
+    public void ShowBattleResult(bool playerWon)
+    {
+        PopulateEnemyVisuals(battleResultTierImage, battleResultEnemyImage, battleResultNameText);
+
+        if (battleResultOutcomeText != null)
+        {
+            battleResultOutcomeText.text  = playerWon ? "VICTORY!" : "DEFEAT";
+            battleResultOutcomeText.color = playerWon
+                ? new Color(1f, 0.88f, 0.2f)
+                : new Color(1f, 0.25f, 0.2f);
+        }
+
+        var gm = GameManager.Instance;
+        if (battleResultInfoText != null)
+            battleResultInfoText.text = playerWon
+                ? $"+{gm.LastLootHp} HP     +{gm.LastLootGold} Gold"
+                : "";
+
+        StartCoroutine(BattleScreenRoutine(battleResultScreen, 2f, () =>
+        {
+            if (GameManager.Instance.State == GameState.GameOver) ShowGameOver();
+            else ShowLoot();
+        }));
+    }
+
+    IEnumerator BattleScreenRoutine(GameObject screen, float holdTime, System.Action onDone)
+    {
+        const float FADE_IN  = 0.25f;
+        const float FADE_OUT = 0.2f;
+
+        var cg = screen.GetComponent<CanvasGroup>();
+        if (cg == null) cg = screen.AddComponent<CanvasGroup>();
+        cg.alpha = 0f;
+        screen.SetActive(true);
+
+        // Fade in
+        for (float t = 0; t < FADE_IN; t += Time.deltaTime)
+        {
+            cg.alpha = t / FADE_IN;
+            yield return null;
+        }
+        cg.alpha = 1f;
+
+        yield return new WaitForSeconds(holdTime);
+
+        // Fade out
+        for (float t = 0; t < FADE_OUT; t += Time.deltaTime)
+        {
+            cg.alpha = 1f - t / FADE_OUT;
+            yield return null;
+        }
+        cg.alpha = 0f;
+        screen.SetActive(false);
+
+        onDone?.Invoke();
+    }
+
+    void PopulateEnemyVisuals(Image tierImg, Image enemyImg, TextMeshProUGUI nameText)
+    {
+        var gm      = GameManager.Instance;
+        int tierIdx = (int)gm.LastPath.enemyTier;
+
+        var tierSprites = mapRenderer?.tierSprites;
+        if (tierImg != null && tierSprites != null && tierIdx < tierSprites.Length)
+        {
+            tierImg.sprite  = tierSprites[tierIdx];
+            tierImg.enabled = tierImg.sprite != null;
+        }
+
+        if (enemyImg != null && battleVisuals?.enemyTierSprites != null && tierIdx < battleVisuals.enemyTierSprites.Length)
+        {
+            enemyImg.sprite  = battleVisuals.enemyTierSprites[tierIdx];
+            enemyImg.enabled = enemyImg.sprite != null;
+        }
+
+        if (nameText != null)
+            nameText.text = _currentEnemyName ?? "";
     }
 
     public void ShowGameOver()
