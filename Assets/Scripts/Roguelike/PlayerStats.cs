@@ -26,6 +26,11 @@ public class PlayerStats
     public int  ambushBonus;           // 15: Ambush
     public int  lastStandBonus;        // 16: Last Stand
     // 17: Hired Muscle → maxHp += 15  (no new field)
+    public int  aimBonus;              // 23,25: Gunslinger / Eagle Eye — flat added to every aim roll
+    public int  aimMax = 5;            // 22: Sniper's Eye — upper bound of aim roll
+    public int  aimMin;                // 21: Steady Hand — lower bound of aim roll
+    public bool aimReroll;             // 24: Lucky Shot — roll twice, take higher
+    public int  goldPerWin;            // 26,27: Wanted Poster / Treasure Map — bonus gold on win
 
     public int blockUses;
     public int maxBlockUses = 3;

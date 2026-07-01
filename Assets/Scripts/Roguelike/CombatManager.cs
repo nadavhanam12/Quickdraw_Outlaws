@@ -37,6 +37,13 @@ public class CombatManager : MonoBehaviour
             Log($"War Paint healed {player.battleStartHeal} HP");
     }
 
+    int RollAim(PlayerStats p)
+    {
+        int roll = rng.Next(p.aimMin, p.aimMax + 1) + p.aimBonus;
+        if (p.aimReroll) roll = Mathf.Max(roll, rng.Next(p.aimMin, p.aimMax + 1) + p.aimBonus);
+        return roll;
+    }
+
     CombatAction GetEnemyAction()
     {
         if (Enemy.bullets == 0) return CombatAction.Reload;
@@ -57,8 +64,8 @@ public class CombatManager : MonoBehaviour
 
         LastPlayerAction   = playerAction;
         LastEnemyAction    = enemyAction;
-        LastPlayerAimBonus = playerAction == CombatAction.Fire ? rng.Next(0, 6) : 0;
-        LastEnemyAimBonus  = enemyAction  == CombatAction.Fire ? rng.Next(0, 6) : 0;
+        LastPlayerAimBonus = playerAction == CombatAction.Fire ? RollAim(Player) : 0;
+        LastEnemyAimBonus  = enemyAction  == CombatAction.Fire ? rng.Next(0, 6)  : 0;
     }
 
     // Phase 2: apply the decided actions and fire events

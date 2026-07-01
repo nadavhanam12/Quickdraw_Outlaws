@@ -95,7 +95,7 @@ public class GameManager : MonoBehaviour
                 Player.hp = Mathf.Min(Player.hp + Player.winHeal, Player.maxHp);
 
             LastLootHp   = Mathf.Min(LastPath.LootHp, 100);
-            LastLootGold = rng.Next(LastPath.LootGoldMin, LastPath.LootGoldMax + 1) + Player.goldBonus;
+            LastLootGold = rng.Next(LastPath.LootGoldMin, LastPath.LootGoldMax + 1) + Player.goldBonus + Player.goldPerWin;
             Player.hp   = Mathf.Min(Player.hp + LastLootHp, Player.maxHp);
             Player.gold += LastLootGold;
 
@@ -158,6 +158,15 @@ public class GameManager : MonoBehaviour
             case 18: Player.maxBulletsBonus      += 2;  break;
             case 19: Player.fireDamageBonus      += 15; break;
             case 20: Player.enemyStartHpPenalty  += 25; break;
+            // Aim upgrades
+            case 21: Player.aimMin   = Mathf.Max(Player.aimMin, 2); break;
+            case 22: Player.aimMax   += 3;    break;
+            case 23: Player.aimBonus += 2;    break;
+            case 24: Player.aimReroll = true; break;
+            case 25: Player.aimBonus += 1;    break;
+            // Gold upgrades
+            case 26: Player.goldPerWin += 20; break;
+            case 27: Player.goldPerWin += 35; break;
         }
         State = GameState.Map;
         UIManager.Instance?.ShowMap();

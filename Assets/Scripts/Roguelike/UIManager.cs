@@ -22,6 +22,9 @@ public class UIManager : MonoBehaviour
     [Header("Combat UI")]
     public TextMeshProUGUI playerActionText;
     public TextMeshProUGUI enemyActionText;
+    public Image           playerActionIcon;
+    public Image           enemyActionIcon;
+    public Sprite[]        actionSprites; // 0=Fire, 1=Defend, 2=Reload (matches CombatAction enum)
     public TextMeshProUGUI playerHpText;
     public TextMeshProUGUI playerBulletsText;
     public TextMeshProUGUI enemyHpText;
@@ -61,6 +64,7 @@ public class UIManager : MonoBehaviour
     public TextMeshProUGUI lootInfoText;
     public Button[] upgradeButtons;
     public TextMeshProUGUI[] upgradeButtonTexts;
+    public Sprite[] upgradeIcons; // index = upgrade id - 1 (id 1 → [0], id 27 → [26])
 
     [Header("Game Over UI")]
     public TextMeshProUGUI gameOverText;
@@ -107,6 +111,8 @@ public class UIManager : MonoBehaviour
         if (selectedActionText != null) selectedActionText.text = "Select an action";
         if (playerActionText   != null) { playerActionText.text = ""; playerActionText.transform.localScale = Vector3.one; }
         if (enemyActionText    != null) { enemyActionText.text  = ""; enemyActionText.transform.localScale  = Vector3.one; }
+        if (playerActionIcon   != null) { playerActionIcon.sprite = null; playerActionIcon.enabled = false; playerActionIcon.transform.localScale = Vector3.one; }
+        if (enemyActionIcon    != null) { enemyActionIcon.sprite  = null; enemyActionIcon.enabled  = false; enemyActionIcon.transform.localScale  = Vector3.one; }
         if (battleBackground != null && battleBackgroundSprites != null && battleBackgroundSprites.Length > 0)
             battleBackground.sprite = battleBackgroundSprites[Random.Range(0, battleBackgroundSprites.Length)];
 
@@ -153,6 +159,13 @@ public class UIManager : MonoBehaviour
                 int id = u.id;
                 upgradeButtons[i].onClick.RemoveAllListeners();
                 upgradeButtons[i].onClick.AddListener(() => GameManager.Instance.ApplyUpgrade(id));
+                if (upgradeIcons != null)
+                {
+                    int iconIdx = u.id - 1;
+                    var iconImg = GetOrCreateButtonIcon(upgradeButtons[i]);
+                    iconImg.sprite  = (iconIdx < upgradeIcons.Length) ? upgradeIcons[iconIdx] : null;
+                    iconImg.enabled = iconImg.sprite != null;
+                }
             }
             else upgradeButtons[i].gameObject.SetActive(false);
         }
@@ -279,6 +292,24 @@ public class UIManager : MonoBehaviour
         fireButton.interactable   = value;
         reloadButton.interactable = value;
         if (!value) defendButton.interactable = false;
+    }
+
+    Image GetOrCreateButtonIcon(Button btn)
+    {
+        var t = btn.transform.Find("UpgradeIcon");
+        if (t != null) return t.GetComponent<Image>();
+
+        var go  = new GameObject("UpgradeIcon", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        go.transform.SetParent(btn.transform, false);
+        var rt  = go.GetComponent<RectTransform>();
+        rt.anchorMin        = new Vector2(0f, 0.5f);
+        rt.anchorMax        = new Vector2(0f, 0.5f);
+        rt.pivot            = new Vector2(0f, 0.5f);
+        rt.anchoredPosition = new Vector2(8f, 0f);
+        rt.sizeDelta        = new Vector2(48f, 48f);
+        var img = go.GetComponent<Image>();
+        img.raycastTarget = false;
+        return img;
     }
 
     void SetScreen(GameObject screen) => StartCoroutine(SlideTransitionTo(screen));
@@ -422,6 +453,16 @@ public class UIManager : MonoBehaviour
         cm.OnBattleEnd    -= OnBattleEndUI;
     }
 
+    void SetActionIcon(Image icon, CombatAction action)
+    {
+        if (icon == null || actionSprites == null) return;
+        int idx = (int)action; // Fire=0, Defend=1, Reload=2
+        if (idx >= actionSprites.Length) return;
+        icon.sprite  = actionSprites[idx];
+        icon.enabled = icon.sprite != null;
+        icon.transform.localScale = icon.enabled ? Vector3.zero : Vector3.one;
+    }
+
     static string ActionLabel(CombatAction action) => action switch
     {
         CombatAction.Fire   => "BANG!",
@@ -441,13 +482,17 @@ public class UIManager : MonoBehaviour
         var pAction = cm.LastPlayerAction.Value;
         var eAction = cm.LastEnemyAction.Value;
 
-        // ── Phase 1: Action texts pop in ──────────────────────────────────
+        // ── Phase 1: Action icons/texts pop in ────────────────────────────
         if (playerActionText != null) { playerActionText.text = ActionLabel(pAction); playerActionText.transform.localScale = Vector3.zero; }
         if (enemyActionText  != null) { enemyActionText.text  = ActionLabel(eAction); enemyActionText.transform.localScale  = Vector3.zero; }
         if (selectedActionText != null) selectedActionText.text = $"► {ActionLabel(pAction)}";
+        SetActionIcon(playerActionIcon, pAction);
+        SetActionIcon(enemyActionIcon,  eAction);
 
         StartCoroutine(ScalePunch(playerActionText?.transform));
         StartCoroutine(ScalePunch(enemyActionText?.transform));
+        StartCoroutine(ScalePunch(playerActionIcon?.transform));
+        StartCoroutine(ScalePunch(enemyActionIcon?.transform));
         yield return new WaitForSeconds(0.45f);
 
         // ── Phase 2: Action animations ────────────────────────────────────
@@ -538,8 +583,8 @@ public class UIManager : MonoBehaviour
         Vector2 eHit = enemyHitMarker  != null ? enemyHitMarker.anchoredPosition  : eTip;
 
         // Anticipation tilt: lean back, then snap forward on fire
-        if (pFires && pSpr != null) StartCoroutine(FireAnticipation(pSpr.rectTransform,  28f, -5f));
-        if (eFires && eSpr != null) StartCoroutine(FireAnticipation(eSpr.rectTransform, -28f,  5f));
+        if (pFires && pSpr != null) StartCoroutine(FireAnticipation(pSpr.rectTransform,  28f, -5f, -70f));
+        if (eFires && eSpr != null) StartCoroutine(FireAnticipation(eSpr.rectTransform,  28f,  5f,  70f));
 
         yield return new WaitForSeconds(1.0f); // lean-back phase
 
@@ -737,7 +782,7 @@ public class UIManager : MonoBehaviour
         icon.transform.localScale = Vector3.one;
     }
 
-    IEnumerator FireAnticipation(RectTransform rt, float leanAngle, float snapAngle)
+    IEnumerator FireAnticipation(RectTransform rt, float leanAngle, float snapAngle, float recoilPush)
     {
         if (rt == null) yield break;
 
@@ -759,7 +804,6 @@ public class UIManager : MonoBehaviour
 
         // Phase 2: fire — snap forward then instantly kick back (recoil), all one frame
         float recoilAngle = leanAngle * 0.45f;
-        float recoilPush  = leanAngle > 0f ? -70f : 70f;
         rt.localRotation    = Quaternion.Euler(0f, 0f, recoilAngle);
         rt.anchoredPosition = origin + new Vector2(recoilPush, 0f);
 
@@ -824,11 +868,10 @@ public class UIManager : MonoBehaviour
             iconImg.sprite = aimRankSprites[rankIdx];
         }
 
-        // ── Bonus text (only if > 0) ──────────────────────────────────────
+        // ── Bonus text (always shown) ─────────────────────────────────────
         GameObject textGo = null;
         RectTransform textRt = null;
         TextMeshProUGUI tmp = null;
-        if (bonus > 0)
         {
             textGo = new GameObject("AimBonus", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
             textGo.transform.SetParent(combatScreen.transform, false);

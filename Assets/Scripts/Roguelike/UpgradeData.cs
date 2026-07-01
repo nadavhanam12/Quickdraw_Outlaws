@@ -28,5 +28,14 @@ public class UpgradeData
         new UpgradeData { id = 18, name = "Extra Clip",      description = "Max bullets +2" },
         new UpgradeData { id = 19, name = "Desperado",       description = "Fire damage +15" },
         new UpgradeData { id = 20, name = "Outlaw Legend",   description = "Enemy starts with -25 HP" },
+        // ── Aim upgrades ──────────────────────────────────────────────────────
+        new UpgradeData { id = 21, name = "Steady Hand",     description = "Aim roll minimum is 2" },
+        new UpgradeData { id = 22, name = "Sniper's Eye",    description = "Aim roll maximum +3" },
+        new UpgradeData { id = 23, name = "Gunslinger",      description = "+2 to every aim roll" },
+        new UpgradeData { id = 24, name = "Lucky Shot",      description = "Aim rolls twice, takes the higher result" },
+        new UpgradeData { id = 25, name = "Eagle Eye",       description = "+1 to every aim roll" },
+        // ── Gold upgrades ─────────────────────────────────────────────────────
+        new UpgradeData { id = 26, name = "Wanted Poster",   description = "Earn +20 bonus gold per victory" },
+        new UpgradeData { id = 27, name = "Treasure Map",    description = "Earn +35 bonus gold per victory" },
     };
 }
