@@ -2725,6 +2725,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MapRenderer
   mapContainer: {fileID: 653229776}
   scrollRect: {fileID: 1727698121}
+  tierSprites:
+  - {fileID: 3454920713312119712, guid: 75c9db206dc54446fbd8bdebf375165e, type: 3}
+  - {fileID: 887039196, guid: 75c9db206dc54446fbd8bdebf375165e, type: 3}
+  - {fileID: -9005667464481513748, guid: 75c9db206dc54446fbd8bdebf375165e, type: 3}
+  - {fileID: -835258414, guid: 75c9db206dc54446fbd8bdebf375165e, type: 3}
+  mapBackgroundSprite: {fileID: -5947945841176723067, guid: 7f7d12b14ff5646cbbf6b25f1b93c3af, type: 3}
 --- !u!114 &824834664
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -47,18 +47,37 @@ public class GameManager : MonoBehaviour
         var rows  = new PathData[MAP_ROWS][];
         var conns = new System.Collections.Generic.List<int>[MAP_ROWS][];
 
+        // Pass 1: generate all rows first so connections can see both ends
         for (int row = 0; row < MAP_ROWS; row++)
         {
             rows[row] = new PathData[3];
-            for (int col = 0; col < 3; col++)
-                rows[row][col] = PathData.Generate(rng, row);
+            if (row == 0)
+            {
+                rows[0][1] = PathData.Generate(rng, 0); // single centre start
+            }
+            else
+            {
+                for (int col = 0; col < 3; col++)
+                    rows[row][col] = PathData.Generate(rng, row);
+                // 50% chance: drop one random node → 2 nodes that row
+                if (rng.Next(2) == 0)
+                    rows[row][rng.Next(3)] = null;
+            }
+        }
 
+        // Pass 2: generate connections now that all rows are known
+        var emptyConns = new System.Collections.Generic.List<int>[]
+            { new System.Collections.Generic.List<int>(),
+              new System.Collections.Generic.List<int>(),
+              new System.Collections.Generic.List<int>() };
+
+        for (int row = 0; row < MAP_ROWS; row++)
+        {
             conns[row] = row < MAP_ROWS - 1
-                ? MapData.GenerateConnections(rng)
-                : new System.Collections.Generic.List<int>[]
-                  { new System.Collections.Generic.List<int>(),
-                    new System.Collections.Generic.List<int>(),
-                    new System.Collections.Generic.List<int>() };
+                ? (row == 0
+                    ? MapData.GenerateSingleSourceConnections(rng)
+                    : MapData.GenerateConnections(rng, rows[row], rows[row + 1]))
+                : emptyConns;
         }
 
         CurrentMap = new MapData(rows, conns);
