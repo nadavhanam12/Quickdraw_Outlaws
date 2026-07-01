@@ -35,6 +35,8 @@ public class UIManager : MonoBehaviour
     public BattleVisuals battleVisuals;
 
     [Header("Combat Animation")]
+    public Image     battleBackground;
+    public Sprite[]  battleBackgroundSprites;
     public Image shieldOverlay;
     public Image enemyShieldOverlay;
     public Transform playerAmmoDisplay;
@@ -45,6 +47,8 @@ public class UIManager : MonoBehaviour
     public Image         enemyBulletImage;
     public RectTransform playerGunTipMarker;
     public RectTransform enemyGunTipMarker;
+    public RectTransform playerHitMarker;
+    public RectTransform enemyHitMarker;
 
     [Header("Loot UI")]
     public TextMeshProUGUI lootTitleText;
@@ -97,6 +101,9 @@ public class UIManager : MonoBehaviour
         if (selectedActionText != null) selectedActionText.text = "Select an action";
         if (playerActionText   != null) { playerActionText.text = ""; playerActionText.transform.localScale = Vector3.one; }
         if (enemyActionText    != null) { enemyActionText.text  = ""; enemyActionText.transform.localScale  = Vector3.one; }
+        if (battleBackground != null && battleBackgroundSprites != null && battleBackgroundSprites.Length > 0)
+            battleBackground.sprite = battleBackgroundSprites[Random.Range(0, battleBackgroundSprites.Length)];
+
         if (shieldOverlay       != null) shieldOverlay.gameObject.SetActive(false);
         if (enemyShieldOverlay  != null) enemyShieldOverlay.gameObject.SetActive(false);
         if (playerBulletImage  != null) playerBulletImage.gameObject.SetActive(false);
@@ -250,9 +257,10 @@ public class UIManager : MonoBehaviour
         bool pFires = pAction == CombatAction.Fire;
         bool eFires = eAction == CombatAction.Fire;
 
-        // Fire: muzzle → bullet → impact + shake (sequenced sub-coroutine)
+        // Fire: muzzle → bullet → impact/deflect + shake (sequenced sub-coroutine)
         if (pFires || eFires)
-            StartCoroutine(FireFX(pFires, eFires, pSpr, eSpr));
+            StartCoroutine(FireFX(pFires, eFires, pSpr, eSpr,
+                pAction == CombatAction.Defend, eAction == CombatAction.Defend));
 
         // Defend: shield overlay + blue flash
         if (pAction == CombatAction.Defend)
@@ -294,27 +302,40 @@ public class UIManager : MonoBehaviour
 
     // ── Fire FX sub-sequence ──────────────────────────────────────────────────
 
-    IEnumerator FireFX(bool pFires, bool eFires, Image pSpr, Image eSpr)
+    IEnumerator FireFX(bool pFires, bool eFires, Image pSpr, Image eSpr, bool pDefends, bool eDefends)
     {
+        // Gun tips: where shots originate
         Vector2 pTip = playerGunTipMarker != null ? playerGunTipMarker.anchoredPosition : new Vector2(-120f, -125f);
         Vector2 eTip = enemyGunTipMarker  != null ? enemyGunTipMarker.anchoredPosition  : new Vector2( 120f,  120f);
 
-        // Muzzle flash at shooter + sprite flash orange (simultaneous)
+        // Hit markers: where bullets land on each target
+        Vector2 pHit = playerHitMarker != null ? playerHitMarker.anchoredPosition : pTip;
+        Vector2 eHit = enemyHitMarker  != null ? enemyHitMarker.anchoredPosition  : eTip;
+
+        // Muzzle flash + shooter sprite flash orange
         if (pFires) { StartCoroutine(MuzzleFlash(pTip)); if (pSpr) StartCoroutine(FlashColor(pSpr, new Color(1f, 0.55f, 0.15f))); }
         if (eFires) { StartCoroutine(MuzzleFlash(eTip)); if (eSpr) StartCoroutine(FlashColor(eSpr, new Color(1f, 0.55f, 0.15f))); }
 
         yield return new WaitForSeconds(0.13f);
 
-        // Each shooter uses their own bullet image so both can fly simultaneously
-        if (pFires) StartCoroutine(BulletFly(playerBulletImage, pTip, eTip));
-        if (eFires) StartCoroutine(BulletFly(enemyBulletImage,  eTip, pTip));
+        // Bullets travel from gun tip to target's hit marker
+        if (pFires) StartCoroutine(BulletFly(playerBulletImage, pTip, eHit));
+        if (eFires) StartCoroutine(BulletFly(enemyBulletImage,  eTip, pHit));
 
         yield return new WaitForSeconds(0.3f);
 
-        // Impact burst + shake at the hit tip
+        // Impact or deflect at the hit marker position
         var impactColor = new Color(1f, 0.75f, 0.2f);
-        if (pFires) { StartCoroutine(ImpactBurst(eTip, impactColor)); if (eSpr) StartCoroutine(Shake(eSpr.rectTransform)); }
-        if (eFires) { StartCoroutine(ImpactBurst(pTip, impactColor)); if (pSpr) StartCoroutine(Shake(pSpr.rectTransform)); }
+        if (pFires)
+        {
+            if (eDefends) StartCoroutine(DeflectBurst(eHit, pTip - eHit, enemyShieldOverlay));
+            else          { StartCoroutine(ImpactBurst(eHit, impactColor)); if (eSpr) StartCoroutine(Shake(eSpr.rectTransform)); }
+        }
+        if (eFires)
+        {
+            if (pDefends) StartCoroutine(DeflectBurst(pHit, eTip - pHit, shieldOverlay));
+            else          { StartCoroutine(ImpactBurst(pHit, impactColor)); if (pSpr) StartCoroutine(Shake(pSpr.rectTransform)); }
+        }
 
         yield return new WaitForSeconds(0.35f);
     }
@@ -460,6 +481,72 @@ public class UIManager : MonoBehaviour
 
         float fadeOut = duration * 0.35f;
         for (float f = 0; f < fadeOut; f += Time.deltaTime) { c.a = 1f - f / fadeOut; overlay.color = c; yield return null; }
+        c.a = 0f; overlay.color = c;
+        overlay.gameObject.SetActive(false);
+    }
+
+    // Sparks fan out 120° in the reflect direction, plus a shield flash
+    IEnumerator DeflectBurst(Vector2 pos, Vector2 incomingDir, Image shieldImg)
+    {
+        StartCoroutine(ShieldFlash(shieldImg));
+
+        int   count    = 8;
+        float spreadRad = 60f * Mathf.Deg2Rad; // ±60° = 120° fan
+        float baseAngle = Mathf.Atan2(-incomingDir.y, -incomingDir.x); // reflect
+
+        var rts  = new RectTransform[count];
+        var imgs = new Image[count];
+        var dirs = new Vector2[count];
+
+        for (int i = 0; i < count; i++)
+        {
+            float a   = baseAngle + Mathf.Lerp(-spreadRad, spreadRad, (float)i / (count - 1));
+            dirs[i]   = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+
+            var go = new GameObject("DeflectSpark", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            go.transform.SetParent(combatScreen.transform, false);
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot     = Vector2.one * 0.5f;
+            rt.anchoredPosition = pos;
+            rt.sizeDelta        = new Vector2(6f, 18f);
+            rt.localRotation    = Quaternion.Euler(0f, 0f, a * Mathf.Rad2Deg);
+            imgs[i] = go.GetComponent<Image>();
+            imgs[i].color = new Color(0.5f, 0.85f, 1f, 1f); // blue-white sparks
+            rts[i]  = rt;
+        }
+
+        float dur = 0.42f;
+        for (float f = 0; f < dur; f += Time.deltaTime)
+        {
+            float t = f / dur;
+            for (int i = 0; i < count; i++)
+            {
+                rts[i].anchoredPosition = pos + dirs[i] * 110f * t;
+                float alpha = Mathf.Lerp(1f, 0f, t * t);
+                imgs[i].color = new Color(0.5f + 0.5f * (1f - t), 0.85f, 1f, alpha);
+            }
+            yield return null;
+        }
+
+        for (int i = 0; i < count; i++) Destroy(rts[i].gameObject);
+    }
+
+    IEnumerator ShieldFlash(Image overlay)
+    {
+        if (overlay == null) yield break;
+        overlay.gameObject.SetActive(true);
+        Color c = overlay.color;
+
+        // Instant full alpha, then quick fade out
+        c.a = 1f; overlay.color = c;
+        float dur = 0.3f;
+        for (float f = 0; f < dur; f += Time.deltaTime)
+        {
+            c.a = 1f - f / dur;
+            overlay.color = c;
+            yield return null;
+        }
         c.a = 0f; overlay.color = c;
         overlay.gameObject.SetActive(false);
     }
