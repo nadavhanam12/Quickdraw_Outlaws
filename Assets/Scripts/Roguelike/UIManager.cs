@@ -154,7 +154,7 @@ public class UIManager : MonoBehaviour
             if (i < upgrades.Length)
             {
                 var u = upgrades[i];
-                upgradeButtonTexts[i].text = $"<b>{u.name}</b>\n{u.description}";
+                upgradeButtonTexts[i].text = $"<b>{u.name}</b>\n<size=80%>{u.description}</size>";
                 upgradeButtons[i].gameObject.SetActive(true);
                 int id = u.id;
                 upgradeButtons[i].onClick.RemoveAllListeners();
@@ -162,9 +162,13 @@ public class UIManager : MonoBehaviour
                 if (upgradeIcons != null)
                 {
                     int iconIdx = u.id - 1;
-                    var iconImg = GetOrCreateButtonIcon(upgradeButtons[i]);
-                    iconImg.sprite  = (iconIdx < upgradeIcons.Length) ? upgradeIcons[iconIdx] : null;
-                    iconImg.enabled = iconImg.sprite != null;
+                    var iconT = upgradeButtons[i].transform.Find("Icon");
+                    if (iconT != null)
+                    {
+                        var iconImg = iconT.GetComponent<Image>();
+                        iconImg.sprite  = (iconIdx < upgradeIcons.Length) ? upgradeIcons[iconIdx] : null;
+                        iconImg.enabled = iconImg.sprite != null;
+                    }
                 }
             }
             else upgradeButtons[i].gameObject.SetActive(false);
@@ -294,25 +298,7 @@ public class UIManager : MonoBehaviour
         if (!value) defendButton.interactable = false;
     }
 
-    Image GetOrCreateButtonIcon(Button btn)
-    {
-        var t = btn.transform.Find("UpgradeIcon");
-        if (t != null) return t.GetComponent<Image>();
-
-        var go  = new GameObject("UpgradeIcon", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-        go.transform.SetParent(btn.transform, false);
-        var rt  = go.GetComponent<RectTransform>();
-        rt.anchorMin        = new Vector2(0f, 0.5f);
-        rt.anchorMax        = new Vector2(0f, 0.5f);
-        rt.pivot            = new Vector2(0f, 0.5f);
-        rt.anchoredPosition = new Vector2(8f, 0f);
-        rt.sizeDelta        = new Vector2(48f, 48f);
-        var img = go.GetComponent<Image>();
-        img.raycastTarget = false;
-        return img;
-    }
-
-    void SetScreen(GameObject screen) => StartCoroutine(SlideTransitionTo(screen));
+void SetScreen(GameObject screen) => StartCoroutine(SlideTransitionTo(screen));
 
     IEnumerator TransitionTo(GameObject screen)
     {
