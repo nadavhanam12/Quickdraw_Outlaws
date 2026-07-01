@@ -86,7 +86,7 @@ public class GameManager : MonoBehaviour
 
     IEnumerator DelayedTransition(bool playerWon)
     {
-        yield return new WaitForSeconds(1.5f);
+        yield return new WaitForSeconds(3.5f);
         if (playerWon)
         {
             CurrentFloor++;

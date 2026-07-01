@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -23,6 +24,20 @@ public class BattleVisuals : MonoBehaviour
     [Header("Shield Icons")]
     public Image[] shieldIcons;
 
+    static readonly string[] EnemyNames =
+    {
+        "Dead-Eye Dan",
+        "Black Hat Bart",
+        "Rattlesnake Roy",
+        "Dusty McGraw",
+        "Iron Joe Colt",
+        "Six-Gun Sal",
+        "Noose Nick",
+        "Scarecrow Kane",
+        "The Widow Maker",
+        "Gallows Bill",
+    };
+
     static readonly Color ShieldFull  = new Color(0.35f, 0.65f, 1f,    1f);
     static readonly Color ShieldEmpty = new Color(0.15f, 0.22f, 0.35f, 1f);
 
@@ -36,20 +51,34 @@ public class BattleVisuals : MonoBehaviour
         }
 
         if (enemyTierLabel != null)
-            enemyTierLabel.text = PathData.EnemyLabel(tier).ToUpper();
+        {
+            string randomName = EnemyNames[Random.Range(0, EnemyNames.Length)];
+            enemyTierLabel.text = randomName;
+        }
     }
 
     public void Refresh(PlayerStats p, EnemyStats e)
     {
         if (playerHpFill != null)
-            playerHpFill.fillAmount = p.maxHp > 0 ? (float)p.hp / p.maxHp : 0f;
+            StartCoroutine(AnimateFill(playerHpFill, p.maxHp > 0 ? (float)p.hp / p.maxHp : 0f));
 
         if (enemyHpFill != null)
-            enemyHpFill.fillAmount = e.maxHp > 0 ? (float)e.hp / e.maxHp : 0f;
+            StartCoroutine(AnimateFill(enemyHpFill, e.maxHp > 0 ? (float)e.hp / e.maxHp : 0f));
 
         RefreshBulletIcons(playerBulletIcons, p.bullets, p.maxBullets);
         RefreshBulletIcons(enemyBulletIcons,  e.bullets, e.maxBullets);
         RefreshShieldIcons(p.blockUses, p.maxBlockUses);
+    }
+
+    IEnumerator AnimateFill(Image fill, float target, float duration = 0.35f)
+    {
+        float start = fill.fillAmount;
+        for (float f = 0; f < duration; f += Time.deltaTime)
+        {
+            fill.fillAmount = Mathf.Lerp(start, target, f / duration);
+            yield return null;
+        }
+        fill.fillAmount = target;
     }
 
     void RefreshBulletIcons(Image[] icons, int current, int max)

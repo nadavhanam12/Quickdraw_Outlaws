@@ -42,6 +42,9 @@ public class UIManager : MonoBehaviour
     public Transform playerAmmoDisplay;
     public Transform enemyAmmoDisplay;
 
+    [Header("Transitions")]
+    public Image transitionOverlay;
+
     [Header("Bullet FX")]
     public Image         playerBulletImage;
     public Image         enemyBulletImage;
@@ -103,6 +106,12 @@ public class UIManager : MonoBehaviour
         if (enemyActionText    != null) { enemyActionText.text  = ""; enemyActionText.transform.localScale  = Vector3.one; }
         if (battleBackground != null && battleBackgroundSprites != null && battleBackgroundSprites.Length > 0)
             battleBackground.sprite = battleBackgroundSprites[Random.Range(0, battleBackgroundSprites.Length)];
+
+        // Reset sprite alphas that may have been zeroed by the end-battle fade
+        if (battleVisuals?.playerSprite != null) { var c = battleVisuals.playerSprite.color; c.a = 1f; battleVisuals.playerSprite.color = c; }
+        if (battleVisuals?.enemySprite  != null) { var c = battleVisuals.enemySprite.color;  c.a = 1f; battleVisuals.enemySprite.color  = c; }
+        // Reset action text color in case it was tinted by the victory/defeat card
+        if (playerActionText != null) playerActionText.color = Color.white;
 
         if (shieldOverlay       != null) shieldOverlay.gameObject.SetActive(false);
         if (enemyShieldOverlay  != null) enemyShieldOverlay.gameObject.SetActive(false);
@@ -167,8 +176,73 @@ public class UIManager : MonoBehaviour
     void OnBattleEndUI(bool playerWon)
     {
         battleEnded = true;
-        AddLog(playerWon ? "=== VICTORY! ===" : "=== DEFEAT ===");
         SetActionButtonsInteractable(false);
+        StartCoroutine(BattleEndSequence(playerWon));
+    }
+
+    IEnumerator BattleEndSequence(bool playerWon)
+    {
+        Image loserSpr  = playerWon ? battleVisuals?.enemySprite  : battleVisuals?.playerSprite;
+        Image winnerSpr = playerWon ? battleVisuals?.playerSprite : battleVisuals?.enemySprite;
+
+        // 1 — big impact burst on the loser
+        if (loserSpr != null)
+        {
+            Vector2 loserPos = loserSpr.rectTransform.anchoredPosition;
+            StartCoroutine(ImpactBurst(loserPos, new Color(1f, 0.75f, 0.2f)));
+            StartCoroutine(ImpactBurst(loserPos + new Vector2(0f, -40f), new Color(0.6f, 0.6f, 0.6f))); // dust
+        }
+
+        yield return new WaitForSeconds(0.15f);
+
+        // 2 — white flash
+        var flashGo = new GameObject("EndFlash", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        flashGo.transform.SetParent(combatScreen.transform, false);
+        var flashRt  = flashGo.GetComponent<RectTransform>();
+        flashRt.anchorMin = Vector2.zero; flashRt.anchorMax = Vector2.one;
+        flashRt.offsetMin = flashRt.offsetMax = Vector2.zero;
+        var flashImg = flashGo.GetComponent<Image>();
+        flashImg.color = new Color(1f, 1f, 1f, 0.85f);
+        yield return null;
+        flashImg.color = Color.clear;
+        Destroy(flashGo);
+
+        // 3 — brief freeze
+        yield return new WaitForSeconds(0.35f);
+
+        // 4 — loser shakes then fades out
+        if (loserSpr != null)
+        {
+            StartCoroutine(Shake(loserSpr.rectTransform, 0.45f, 18f));
+            yield return new WaitForSeconds(0.45f);
+            float fadeDur = 0.4f;
+            Color c = loserSpr.color;
+            for (float f = 0; f < fadeDur; f += Time.deltaTime)
+            {
+                c.a = 1f - f / fadeDur;
+                loserSpr.color = c;
+                yield return null;
+            }
+            c.a = 0f; loserSpr.color = c;
+        }
+
+        // 5 — winner bounces
+        if (winnerSpr != null)
+            StartCoroutine(BounceScale(winnerSpr.transform, 0.4f));
+
+        yield return new WaitForSeconds(0.25f);
+
+        // 6 — WIN / DEFEAT card punches in
+        if (playerActionText != null)
+        {
+            playerActionText.text = playerWon ? "VICTORY!" : "DEFEAT";
+            playerActionText.color = playerWon ? new Color(1f, 0.88f, 0.2f) : new Color(1f, 0.25f, 0.2f);
+            playerActionText.transform.localScale = Vector3.zero;
+            StartCoroutine(ScalePunch(playerActionText.transform, 0.4f));
+        }
+
+        yield return new WaitForSeconds(1.2f);
+        // GameManager.HandleBattleEnd is already subscribed to OnBattleEnd and will transition screens
     }
 
     void RefreshCombatUI()
@@ -179,9 +253,9 @@ public class UIManager : MonoBehaviour
         var e  = cm.Enemy;
         if (p == null || e == null) return;
 
-        if (playerHpText      != null) playerHpText.text      = $"HP: {p.hp} / {p.maxHp}";
+        if (playerHpText      != null) playerHpText.text      = $"{p.hp} / {p.maxHp}";
         if (playerBulletsText != null) playerBulletsText.text = $"Bullets: {p.bullets} / {p.maxBullets}";
-        if (enemyHpText       != null) enemyHpText.text       = $"HP: {e.hp} / {e.maxHp}";
+        if (enemyHpText       != null) enemyHpText.text       = $"{e.hp} / {e.maxHp}";
         if (enemyBulletsText  != null) enemyBulletsText.text  = $"Bullets: {e.bullets} / {e.maxBullets}";
         if (blockUsesText     != null) blockUsesText.text     = $"Shield: {p.blockUses} / {p.maxBlockUses}";
 
@@ -204,7 +278,130 @@ public class UIManager : MonoBehaviour
         if (!value) defendButton.interactable = false;
     }
 
-    void SetScreen(GameObject screen)
+    void SetScreen(GameObject screen) => StartCoroutine(SlideTransitionTo(screen));
+
+    IEnumerator TransitionTo(GameObject screen)
+    {
+        if (transitionOverlay == null)
+        {
+            SwitchScreen(screen);
+            yield break;
+        }
+
+        // 1 — white flash (1 frame)
+        transitionOverlay.color = new Color(1f, 1f, 1f, 0.9f);
+        yield return null;
+
+        // 2 — fade to black (0.2s)
+        float fadeIn = 0.2f;
+        for (float f = 0; f < fadeIn; f += Time.deltaTime)
+        {
+            float t = f / fadeIn;
+            transitionOverlay.color = new Color(Mathf.Lerp(1f, 0f, t), Mathf.Lerp(1f, 0f, t), Mathf.Lerp(1f, 0f, t), 1f);
+            yield return null;
+        }
+        transitionOverlay.color = Color.black;
+
+        // 3 — swap screen at peak black
+        SwitchScreen(screen);
+
+        // 4 — fade back in (0.25s)
+        float fadeOut = 0.25f;
+        for (float f = 0; f < fadeOut; f += Time.deltaTime)
+        {
+            transitionOverlay.color = new Color(0f, 0f, 0f, 1f - f / fadeOut);
+            yield return null;
+        }
+        transitionOverlay.color = new Color(0f, 0f, 0f, 0f);
+    }
+
+    IEnumerator SlideTransitionTo(GameObject nextScreen)
+    {
+        const float width = 1280f;
+        const float dur   = 0.3f;
+
+        // Find currently visible screen
+        GameObject current = null;
+        foreach (var s in new[] { mapScreen, combatScreen, lootScreen, gameOverScreen })
+            if (s != null && s.activeSelf && s != nextScreen) { current = s; break; }
+
+        // Bring next screen in from the right, hidden at start
+        nextScreen.SetActive(true);
+        var nextRt    = nextScreen.GetComponent<RectTransform>();
+        var currentRt = current?.GetComponent<RectTransform>();
+
+        Vector2 nextStart    = new Vector2( width, 0f);
+        Vector2 nextEnd      = Vector2.zero;
+        Vector2 currentStart = Vector2.zero;
+        Vector2 currentEnd   = new Vector2(-width, 0f);
+
+        if (nextRt)    nextRt.anchoredPosition    = nextStart;
+        if (currentRt) currentRt.anchoredPosition = currentStart;
+
+        for (float f = 0; f < dur; f += Time.deltaTime)
+        {
+            float t = 1f - Mathf.Pow(1f - f / dur, 3f); // ease-out cubic
+            if (nextRt)    nextRt.anchoredPosition    = Vector2.Lerp(nextStart,    nextEnd,    t);
+            if (currentRt) currentRt.anchoredPosition = Vector2.Lerp(currentStart, currentEnd, t);
+            yield return null;
+        }
+
+        if (nextRt)    nextRt.anchoredPosition    = nextEnd;
+        if (currentRt) currentRt.anchoredPosition = currentStart; // reset before hiding
+
+        if (current != null) current.SetActive(false);
+
+        // Hide other screens too
+        foreach (var s in new[] { mapScreen, combatScreen, lootScreen, gameOverScreen })
+            if (s != null && s != nextScreen) s.SetActive(false);
+    }
+
+    IEnumerator IrisWipeTo(GameObject screen)
+    {
+        // Spawn a circle that expands to cover the screen
+        var go = new GameObject("Iris", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        go.transform.SetParent(transitionOverlay != null ? transitionOverlay.transform.parent : combatScreen.transform.parent, false);
+        go.transform.SetAsLastSibling();
+
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot     = Vector2.one * 0.5f;
+        rt.anchoredPosition = Vector2.zero;
+
+        var img = go.GetComponent<Image>();
+        img.color = Color.black;
+        img.raycastTarget = false;
+
+        // Assign circle sprite if available, otherwise the square covers fine at full black
+        var circleSprite = Resources.GetBuiltinResource<Sprite>("UI/Skin/Knob.psd");
+        if (circleSprite != null) img.sprite = circleSprite;
+
+        float expandDur = 0.32f;
+        float maxSize   = 1600f; // covers 1280x720 diagonally
+        for (float f = 0; f < expandDur; f += Time.deltaTime)
+        {
+            float t = f / expandDur;
+            float ease = t * t;
+            rt.sizeDelta = Vector2.one * Mathf.Lerp(0f, maxSize, ease);
+            yield return null;
+        }
+        rt.sizeDelta = Vector2.one * maxSize;
+
+        SwitchScreen(screen);
+
+        float shrinkDur = 0.35f;
+        for (float f = 0; f < shrinkDur; f += Time.deltaTime)
+        {
+            float t = f / shrinkDur;
+            float ease = 1f - (1f - t) * (1f - t);
+            rt.sizeDelta = Vector2.one * Mathf.Lerp(maxSize, 0f, ease);
+            yield return null;
+        }
+
+        Destroy(go);
+    }
+
+    void SwitchScreen(GameObject screen)
     {
         if (mapScreen)      mapScreen.SetActive(false);
         if (combatScreen)   combatScreen.SetActive(false);
@@ -274,19 +471,44 @@ public class UIManager : MonoBehaviour
             if (eSpr != null) StartCoroutine(FlashColor(eSpr, new Color(0.35f, 0.65f, 1f), 0.55f));
         }
 
-        // Reload: bounce the ammo display
-        if (pAction == CombatAction.Reload && playerAmmoDisplay != null)
-            StartCoroutine(BounceScale(playerAmmoDisplay));
-        if (eAction == CombatAction.Reload && enemyAmmoDisplay != null)
-            StartCoroutine(BounceScale(enemyAmmoDisplay));
+        // Reload: character shake + gold flash + bullet overshoot bounce
+        if (pAction == CombatAction.Reload && battleVisuals?.playerBulletIcons != null)
+        {
+            if (pSpr != null) StartCoroutine(ReloadCharacterFX(pSpr));
+            int idx  = Mathf.Clamp(cm.Player.bullets, 0, battleVisuals.playerBulletIcons.Length - 1);
+            var icon = battleVisuals.playerBulletIcons[idx];
+            icon.gameObject.SetActive(true);
+            StartCoroutine(ReloadBulletFX(icon, battleVisuals.bulletFilledSprite));
+        }
+        if (eAction == CombatAction.Reload && battleVisuals?.enemyBulletIcons != null)
+        {
+            if (eSpr != null) StartCoroutine(ReloadCharacterFX(eSpr));
+            int idx  = Mathf.Clamp(cm.Enemy.bullets, 0, battleVisuals.enemyBulletIcons.Length - 1);
+            var icon = battleVisuals.enemyBulletIcons[idx];
+            icon.gameObject.SetActive(true);
+            StartCoroutine(ReloadBulletFX(icon, battleVisuals.bulletFilledSprite));
+        }
 
-        yield return new WaitForSeconds(0.78f);
+        // Wait just long enough for the active animations to finish
+        float phase2Wait = (pFires || eFires) ? 2.0f : 0.65f;
+        yield return new WaitForSeconds(phase2Wait);
 
         // ── Phase 3: Apply + show results ─────────────────────────────────
+        int prePlayerHp = cm.Player.hp;
+        int preEnemyHp  = cm.Enemy.hp;
+
         cm.ApplyTurn();
 
-        if (playerHpText  != null) playerHpText.text  = $"HP: {cm.Player.hp} / {cm.Player.maxHp}";
-        if (enemyHpText   != null) enemyHpText.text   = $"HP: {cm.Enemy.hp} / {cm.Enemy.maxHp}";
+        int playerDmgTaken = Mathf.Max(0, prePlayerHp - cm.Player.hp);
+        int enemyDmgTaken  = Mathf.Max(0, preEnemyHp  - cm.Enemy.hp);
+
+        if (playerDmgTaken > 0 && battleVisuals?.playerSprite != null)
+            StartCoroutine(FloatDamageText($"-{playerDmgTaken}", battleVisuals.playerSprite.rectTransform.anchoredPosition, new Color(1f, 0.25f, 0.2f)));
+        if (enemyDmgTaken > 0 && battleVisuals?.enemySprite != null)
+            StartCoroutine(FloatDamageText($"-{enemyDmgTaken}", battleVisuals.enemySprite.rectTransform.anchoredPosition, new Color(1f, 0.25f, 0.2f)));
+
+        if (playerHpText  != null) playerHpText.text  = $"{cm.Player.hp} / {cm.Player.maxHp}";
+        if (enemyHpText   != null) enemyHpText.text   = $"{cm.Enemy.hp} / {cm.Enemy.maxHp}";
         if (blockUsesText != null) blockUsesText.text = $"Shield: {cm.Player.blockUses} / {cm.Player.maxBlockUses}";
         battleVisuals?.Refresh(cm.Player, cm.Enemy);
 
@@ -312,7 +534,13 @@ public class UIManager : MonoBehaviour
         Vector2 pHit = playerHitMarker != null ? playerHitMarker.anchoredPosition : pTip;
         Vector2 eHit = enemyHitMarker  != null ? enemyHitMarker.anchoredPosition  : eTip;
 
-        // Muzzle flash + shooter sprite flash orange
+        // Anticipation tilt: lean back, then snap forward on fire
+        if (pFires && pSpr != null) StartCoroutine(FireAnticipation(pSpr.rectTransform,  28f, -5f));
+        if (eFires && eSpr != null) StartCoroutine(FireAnticipation(eSpr.rectTransform, -28f,  5f));
+
+        yield return new WaitForSeconds(1.0f); // lean-back phase
+
+        // Muzzle flash + shooter sprite flash orange (synced with snap-forward)
         if (pFires) { StartCoroutine(MuzzleFlash(pTip)); if (pSpr) StartCoroutine(FlashColor(pSpr, new Color(1f, 0.55f, 0.15f))); }
         if (eFires) { StartCoroutine(MuzzleFlash(eTip)); if (eSpr) StartCoroutine(FlashColor(eSpr, new Color(1f, 0.55f, 0.15f))); }
 
@@ -459,6 +687,86 @@ public class UIManager : MonoBehaviour
         rt.anchoredPosition = orig;
     }
 
+    IEnumerator ReloadCharacterFX(Image spr)
+    {
+        if (spr == null) yield break;
+        // Quick nervous shake
+        yield return StartCoroutine(Shake(spr.rectTransform, 0.25f, 5f));
+    }
+
+    IEnumerator ReloadBulletFX(Image icon, Sprite filledSprite)
+    {
+        if (icon == null) yield break;
+
+        // Gold flash
+        var origColor = icon.color;
+        icon.color = new Color(1f, 0.95f, 0.2f, 1f);
+        yield return null;
+        icon.color = origColor;
+
+        // Scale up to peak
+        float dur  = 0.35f;
+        float peak = 1.6f;
+        float half = dur * 0.5f;
+        for (float f = 0; f < half; f += Time.deltaTime)
+        {
+            icon.transform.localScale = Vector3.one * Mathf.Lerp(0f, peak, f / half);
+            yield return null;
+        }
+
+        // Swap to filled sprite at peak
+        if (filledSprite != null) icon.sprite = filledSprite;
+        icon.color = origColor;
+
+        // Scale back down
+        for (float f = 0; f < half; f += Time.deltaTime)
+        {
+            icon.transform.localScale = Vector3.one * Mathf.Lerp(peak, 1f, f / half);
+            yield return null;
+        }
+        icon.transform.localScale = Vector3.one;
+    }
+
+    IEnumerator FireAnticipation(RectTransform rt, float leanAngle, float snapAngle)
+    {
+        if (rt == null) yield break;
+
+        Vector2 origin = rt.anchoredPosition;
+
+        // Phase 1: lean back with shake that starts slow and grows with the lean
+        float leanDur  = 1.0f;
+        float maxShake = 3f;
+        for (float f = 0; f < leanDur; f += Time.deltaTime)
+        {
+            float t        = f / leanDur;
+            float lean     = t * t;                    // ease-in — slow start, accelerates into lean
+            float shakeMag = maxShake * lean;          // shake tied to lean progress, near-zero at start
+
+            rt.localRotation    = Quaternion.Euler(0f, 0f, Mathf.Lerp(0f, leanAngle, lean));
+            rt.anchoredPosition = origin + new Vector2(Random.Range(-1f, 1f), Random.Range(-1f, 1f)) * shakeMag;
+            yield return null;
+        }
+
+        // Phase 2: fire — snap forward then instantly kick back (recoil), all one frame
+        float recoilAngle = leanAngle * 0.45f;
+        float recoilPush  = leanAngle > 0f ? -70f : 70f;
+        rt.localRotation    = Quaternion.Euler(0f, 0f, recoilAngle);
+        rt.anchoredPosition = origin + new Vector2(recoilPush, 0f);
+
+        // Phase 3: ease-out settle back to exact origin position and zero rotation
+        float settleDur   = 0.4f;
+        Vector2 recoilPos = origin + new Vector2(recoilPush, 0f);
+        for (float f = 0; f < settleDur; f += Time.deltaTime)
+        {
+            float t = 1f - Mathf.Pow(1f - f / settleDur, 3f); // ease-out cubic
+            rt.localRotation    = Quaternion.Euler(0f, 0f, Mathf.Lerp(recoilAngle, 0f, t));
+            rt.anchoredPosition = Vector2.Lerp(recoilPos, origin, t);
+            yield return null;
+        }
+        rt.localRotation    = Quaternion.identity;
+        rt.anchoredPosition = origin;
+    }
+
     IEnumerator BounceScale(Transform t, float duration = 0.32f)
     {
         if (t == null) yield break;
@@ -483,6 +791,35 @@ public class UIManager : MonoBehaviour
         for (float f = 0; f < fadeOut; f += Time.deltaTime) { c.a = 1f - f / fadeOut; overlay.color = c; yield return null; }
         c.a = 0f; overlay.color = c;
         overlay.gameObject.SetActive(false);
+    }
+
+    IEnumerator FloatDamageText(string text, Vector2 pos, Color color)
+    {
+        var go = new GameObject("DmgText", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        go.transform.SetParent(combatScreen.transform, false);
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot     = Vector2.one * 0.5f;
+        rt.anchoredPosition = pos + new Vector2(0f, 30f);
+        rt.sizeDelta = new Vector2(200f, 100f);
+
+        var tmp = go.GetComponent<TextMeshProUGUI>();
+        tmp.text      = text;
+        tmp.color     = color;
+        tmp.fontSize  = 72f;
+        tmp.fontStyle = FontStyles.Bold;
+        tmp.alignment = TextAlignmentOptions.Center;
+
+        float dur = 0.8f;
+        Vector2 startPos = rt.anchoredPosition;
+        for (float f = 0; f < dur; f += Time.deltaTime)
+        {
+            float t = f / dur;
+            rt.anchoredPosition = startPos + new Vector2(0f, 60f * t);
+            Color c = tmp.color; c.a = 1f - t * t; tmp.color = c;
+            yield return null;
+        }
+        Destroy(go);
     }
 
     // Sparks fan out 120° in the reflect direction, plus a shield flash
