@@ -139,6 +139,10 @@ public static class RoguelikeSceneSetup
         var enemyBullets = IconRow(combatGO.transform, "EnemyBullet",
             V2(320f, -152f), 6, 35f, 26f, new Color(1f, 0.88f, 0.2f, 1f));
 
+        var enemyBlockTMP = Txt(combatGO.transform, "EnemyBlockUsesText", "Shield: 3 / 3",
+            14f, V2(320f, -218f), V2(210f, 28f),
+            new Color(0.45f, 0.70f, 1f, 1f), TextAlignmentOptions.Center);
+
         var enemyBulTMP = Txt(combatGO.transform, "EnemyBulletsText", "",
             8f, V2(320f, -188f), V2(200f, 18f),
             new Color(0.5f, 0.5f, 0.5f, 0.4f), TextAlignmentOptions.Center);
@@ -219,6 +223,7 @@ public static class RoguelikeSceneSetup
         SetF(uiMgr, "defendButton",       defendBtn);
         SetF(uiMgr, "reloadButton",       reloadBtn);
         SetF(uiMgr, "blockUsesText",      blockTMP);
+        SetF(uiMgr, "enemyBlockUsesText", enemyBlockTMP);
         SetF(uiMgr, "combatLogText",      logTMP);
         SetF(uiMgr, "lootTitleText",      lootTitleTMP);
         SetF(uiMgr, "lootInfoText",       lootInfoTMP);

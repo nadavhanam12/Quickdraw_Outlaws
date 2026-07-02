@@ -111,7 +111,7 @@ public class GameManager : MonoBehaviour
             CurrentFloor++;
             if (Player.winHeal > 0)
                 Player.hp = Mathf.Min(Player.hp + Player.winHeal, Player.maxHp);
-            LastLootHp   = Mathf.Min(LastPath.LootHp, 100);
+            LastLootHp   = 0;
             LastLootGold = rng.Next(LastPath.LootGoldMin, LastPath.LootGoldMax + 1) + Player.goldBonus + Player.goldPerWin;
             Player.hp   = Mathf.Min(Player.hp + LastLootHp, Player.maxHp);
             Player.gold += LastLootGold;

@@ -38,6 +38,7 @@ public class UIManager : MonoBehaviour
     public Button defendButton;
     public Button reloadButton;
     public TextMeshProUGUI blockUsesText;
+    public TextMeshProUGUI enemyBlockUsesText;
     public TextMeshProUGUI combatLogText;
     public BattleVisuals battleVisuals;
 
@@ -380,7 +381,8 @@ public class UIManager : MonoBehaviour
         if (enemyHpText       != null) enemyHpText.text       = $"{e.hp} / {e.maxHp}";
         if (enemyBulletsText  != null) enemyBulletsText.text  = $"Bullets: {e.bullets} / {e.maxBullets}";
         if (enemyDamageText   != null) enemyDamageText.text   = $"DMG  {e.damage}";
-        if (blockUsesText     != null) blockUsesText.text     = $"Shield: {p.blockUses} / {p.maxBlockUses}";
+        if (blockUsesText      != null) blockUsesText.text      = $"Shield: {p.blockUses} / {p.maxBlockUses}";
+        if (enemyBlockUsesText != null) enemyBlockUsesText.text = $"Shield: {e.blockUses} / {e.maxBlockUses}";
 
         fireButton.interactable   = !battleEnded;
         defendButton.interactable = !battleEnded && p.blockUses > 0;
@@ -646,7 +648,8 @@ void SetScreen(GameObject screen) => StartCoroutine(SlideTransitionTo(screen));
 
         if (playerHpText  != null) playerHpText.text  = $"{cm.Player.hp} / {cm.Player.maxHp}";
         if (enemyHpText   != null) enemyHpText.text   = $"{cm.Enemy.hp} / {cm.Enemy.maxHp}";
-        if (blockUsesText != null) blockUsesText.text = $"Shield: {cm.Player.blockUses} / {cm.Player.maxBlockUses}";
+        if (blockUsesText      != null) blockUsesText.text      = $"Shield: {cm.Player.blockUses} / {cm.Player.maxBlockUses}";
+        if (enemyBlockUsesText != null) enemyBlockUsesText.text = $"Shield: {cm.Enemy.blockUses} / {cm.Enemy.maxBlockUses}";
         battleVisuals?.Refresh(cm.Player, cm.Enemy);
 
         yield return new WaitForSeconds(0.25f);
