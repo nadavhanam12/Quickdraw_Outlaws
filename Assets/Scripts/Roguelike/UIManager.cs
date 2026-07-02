@@ -584,9 +584,8 @@ void SetScreen(GameObject screen) => StartCoroutine(SlideTransitionTo(screen));
         StartCoroutine(ScalePunch(enemyActionText?.transform));
         StartCoroutine(ScalePunch(playerActionIcon?.transform));
         StartCoroutine(ScalePunch(enemyActionIcon?.transform));
-        yield return new WaitForSeconds(0.45f);
 
-        // ── Phase 2: Action animations ────────────────────────────────────
+        // ── Phase 2: Action animations (run concurrently with the icon pop) ──
         var pSpr = battleVisuals?.playerSprite;
         var eSpr = battleVisuals?.enemySprite;
 
@@ -629,7 +628,7 @@ void SetScreen(GameObject screen) => StartCoroutine(SlideTransitionTo(screen));
         }
 
         // Wait just long enough for the active animations to finish
-        float phase2Wait = (pFires || eFires) ? 2.0f : 0.65f;
+        float phase2Wait = (pFires || eFires) ? 1.0f : 0.65f;
         yield return new WaitForSeconds(phase2Wait);
 
         // ── Phase 3: Apply + show results ─────────────────────────────────
@@ -678,7 +677,7 @@ void SetScreen(GameObject screen) => StartCoroutine(SlideTransitionTo(screen));
         if (pFires && pSpr != null) StartCoroutine(FireAnticipation(pSpr.rectTransform,  28f, -5f, -70f));
         if (eFires && eSpr != null) StartCoroutine(FireAnticipation(eSpr.rectTransform,  28f,  5f,  70f));
 
-        yield return new WaitForSeconds(1.0f); // lean-back phase
+        yield return new WaitForSeconds(0.18f); // lean-back phase
 
         // Snap moment: muzzle flash + bullet + aim popup all fire together
         var cm2 = CombatManager.Instance;
@@ -881,7 +880,7 @@ void SetScreen(GameObject screen) => StartCoroutine(SlideTransitionTo(screen));
         Vector2 origin = rt.anchoredPosition;
 
         // Phase 1: lean back with shake that starts slow and grows with the lean
-        float leanDur  = 1.0f;
+        float leanDur  = 0.18f;
         float maxShake = 3f;
         for (float f = 0; f < leanDur; f += Time.deltaTime)
         {
